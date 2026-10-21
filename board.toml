@@ -1,0 +1,5 @@
+[board]
+name = "amethyst"
+soc = "SM7635"
+description = "Xiaomi Redmi Note 14 Pro+ 5G"
+kit = "amethyst"
