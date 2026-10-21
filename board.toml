@@ -3,3 +3,81 @@ name = "amethyst"
 soc = "SM7635"
 description = "Xiaomi Redmi Note 14 Pro+ 5G"
 kit = "amethyst"
+
+[ipsw]
+url = "https://updates.cdn-apple.com/2023FallFCS/fullrestores/042-49498/8EBB3EC5-4819-4481-85CB-8F49BF3EFD16/iPad14,3,iPad14,4,iPad14,5,iPad14,6_17.0_21A329_Restore.ipsw"
+product = "iPad14,3"
+version = "17.0"
+build = "21A329"
+device_class = "ipad"
+chip_id = 0x8112
+board_id = 0x0
+fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustCache"]
+
+[ipsw.sha256]
+"044-73541-011.dmg" = "5e2b4f9812a45c7b39df58dbb3e558a74e50882e34e5677b102bce0453d10de83"
+"044-73549-011.dmg" = "cd490bcf41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f"
+
+[userdata]
+first_lba = 0x26c000
+last_lba = 0x3b1fffa
+lba_bytes = 4096
+windows = [
+  { name = "OS", component = "OS" },
+  { name = "SystemOS", component = "Cryptex1,SystemOS" },
+]
+
+[kernel]
+defconfig = "amethyst_defconfig"
+archives = [
+  "scripts/build-corecrypto-14.py",
+  "scripts/build-corecrypto-14.py --namespace",
+  "scripts/build-arm-driver.py ArmDTPlatform",
+  "scripts/build-arm-driver.py ArmCpu",
+  "scripts/build-arm-driver.py NativeAES",
+  "scripts/build-native-aes-bindings.py",
+  "scripts/build-arm-driver.py NativeUfs",
+  "scripts/build-mockfs-fixture.py",
+  "scripts/build-amethyst-platform-power.py",
+  "scripts/build-boot-progress.py",
+  "scripts/build-libpthread-kernel.py",
+  "scripts/build-arm-driver.py NativeAdreno",
+  "scripts/build-native-adreno-kits.py",
+  "scripts/build-native-adreno-accelerator.py",
+  "scripts/build-native-legacy-display.py",
+]
+
+[kernel.prelink]
+tool = "kits/NativePrelink/emit_prelink.py"
+kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_GENERIC/mach.development.generic.unstripped"
+kernelcache_sha256 = "a0bc4b92b67d58309df58dbb3e558a74e50882e34e5677b102bce0453d10de83"
+slide = "-0x1000000"
+early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
+roots = [
+  "com.apple.AppleFSCompression.AppleFSCompressionTypeZlib",
+  "com.apple.driver.AppleARMPlatform",
+  "com.apple.driver.AppleARMWatchdogTimer",
+  "com.apple.driver.AppleAudioClockLibs",
+  "com.apple.driver.AppleEffaceableStorage",
+  "com.apple.driver.AppleMobileFileIntegrity",
+  "com.apple.driver.ApplePMGR",
+  "com.apple.driver.IODARTFamily",
+  "com.apple.filesystems.apfs",
+  "com.apple.iokit.CoreAnalyticsFamily",
+  "com.apple.iokit.IOAVFamily",
+  "com.apple.iokit.IOAudio2Family",
+  "com.apple.iokit.IOCryptoAcceleratorFamily",
+  "com.apple.iokit.IOGPUFamily",
+  "com.apple.iokit.IOMobileGraphicsFamily",
+  "com.apple.iokit.IOReportFamily",
+  "com.apple.iokit.IOStorageFamily",
+  "com.apple.iokit.IOSsurface",
+  "com.apple.kec.Libm",
+  "com.apple.kec.corecrypto",
+  "com.apple.kext.AppleMatch",
+  "com.apple.kext.CoreTrust",
+  "com.apple.security.AppleImage4",
+  "com.apple.security.sandbox",
+  "com.apple.iokit.IOHIDFamily",
+  "com.apple.iokit.IOHIDEventDriver",
+]
