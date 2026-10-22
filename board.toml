@@ -30,21 +30,10 @@ windows = [
 [kernel]
 defconfig = "amethyst_defconfig"
 archives = [
+  "scripts/build-native-aes-bindings.py",
+  "scripts/build-libpthread-kernel.py",
   "scripts/build-corecrypto-14.py",
   "scripts/build-corecrypto-14.py --namespace",
-  "scripts/build-arm-driver.py ArmDTPlatform",
-  "scripts/build-arm-driver.py ArmCpu",
-  "scripts/build-arm-driver.py NativeAES",
-  "scripts/build-native-aes-bindings.py",
-  "scripts/build-arm-driver.py NativeUfs",
-  "scripts/build-mockfs-fixture.py",
-  "scripts/build-amethyst-platform-power.py",
-  "scripts/build-boot-progress.py",
-  "scripts/build-libpthread-kernel.py",
-  "scripts/build-arm-driver.py NativeAdreno",
-  "scripts/build-native-adreno-kits.py",
-  "scripts/build-native-adreno-accelerator.py",
-  "scripts/build-native-legacy-display.py",
 ]
 
 [kernel.prelink]
@@ -54,30 +43,39 @@ kernelcache_sha256 = "a0bc4b92b67d58309df58dbb3e558a74e50882e34e5677b102bce0453d
 slide = "-0x1000000"
 early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
 roots = [
-  "com.apple.AppleFSCompression.AppleFSCompressionTypeZlib",
   "com.apple.driver.AppleARMPlatform",
-  "com.apple.driver.AppleARMWatchdogTimer",
-  "com.apple.driver.AppleAudioClockLibs",
-  "com.apple.driver.AppleEffaceableStorage",
-  "com.apple.driver.AppleMobileFileIntegrity",
-  "com.apple.driver.ApplePMGR",
-  "com.apple.driver.IODARTFamily",
   "com.apple.filesystems.apfs",
-  "com.apple.iokit.CoreAnalyticsFamily",
-  "com.apple.iokit.IOAVFamily",
-  "com.apple.iokit.IOAudio2Family",
-  "com.apple.iokit.IOCryptoAcceleratorFamily",
-  "com.apple.iokit.IOGPUFamily",
-  "com.apple.iokit.IOMobileGraphicsFamily",
-  "com.apple.iokit.IOReportFamily",
-  "com.apple.iokit.IOStorageFamily",
-  "com.apple.iokit.IOSsurface",
-  "com.apple.kec.Libm",
-  "com.apple.kec.corecrypto",
-  "com.apple.kext.AppleMatch",
-  "com.apple.kext.CoreTrust",
-  "com.apple.security.AppleImage4",
-  "com.apple.security.sandbox",
-  "com.apple.iokit.IOHIDFamily",
-  "com.apple.iokit.IOHIDEventDriver",
+]
+extra_args = []
+
+[firmware]
+config = "amethyst"
+dsc = "Platforms/Xiaomi/amethystPkg/amethyst.dsc"
+fd = "Build/amethystPkg/{target}_CLANGPDB/FV/SILICIUM_UEFI.fd"
+preflight = ["scripts/check-amethyst.py"]
+submodules = ["Common/Mu", "Common/Mu_OEM_Sample", "Silicium-ACPI", "Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl"]
+patches = ["Resources/MuPatches/Gic-Spurious.patch"]
+packages = [
+  "{uefi}",
+  "{uefi}/Platforms/Xiaomi",
+  "{tree}/package",
+  "{tree}/drivers/DarwinBoot",
+  "{edk2}",
+  "{uefi}/Common/Mu",
+  "{uefi}/Common/Mu_OEM_Sample",
+  "{uefi}/Silicon/Qualcomm",
+  "{uefi}/Silicon/Silicium",
+  "{uefi}/Silicium-ACPI",
+  "{uefi}/Silicium-ACPI/Platforms/Xiaomi",
+  "{uefi}/Silicium-ACPI/Silicon/Qualcomm",
+]
+
+[firmware.defines]
+DEVICE_MODEL = "amethyst"
+
+[[bootimg.dtb_node]]
+path = "/reserved-memory/splash_region"
+props = [
+  { name = "label", type = "s", value = "cont_splash_region" },
+  { name = "reg", type = "x", value = ["0x0", "0x80000000", "0x0", "0x100000"] }, # todo: replace with actual offsets
 ]
