@@ -7,8 +7,8 @@ kit = "amethyst"
 [ipsw]
 url = "https://updates.cdn-apple.com/2025FallFCS/fullrestores/122-77006/1158E502-D76D-4226-AA06-ED5E30CD1111/iPhone10,3,iPhone10,6_16.7.16_20H392_Restore.ipsw"
 product = "iPhone10,3"
-version = "16.5"
-build = "20F66"
+version = "16.7.16"
+build = "20H392"
 device_class = "iphone"
 chip_id = 0x8015
 board_id = 0x06
@@ -67,11 +67,27 @@ packages = [
 ]
 
 [firmware.defines]
+ENABLE_SECUREBOOT = "1"
 DEVICE_MODEL = "amethyst"
+MEMORY_PROTECTION = "TRUE"
+SHIP_MODE = "FALSE"
+BUILDID_STRING = "amethyst-research"
 
-[[bootimg.dtb_node]]
-path = "/reserved-memory/splash_region"
-props = [
-  { name = "label", type = "s", value = "cont_splash_region" },
-  { name = "reg", type = "x", value = ["0x0", "0x80000000", "0x0", "0x100000"] }, # todo: replace with actual offsets
+[payload]
+volume = "AMETHYSTESP"
+size_mib = 128
+loader = "firmware"
+title = "UniXNU for Redmi Note 14 Pro+ 5G"
+dram_size = "0x200000000"
+kernel_args = [
+  "-v",
+  "serial=3",
+  "debug=0x14e",
 ]
+
+[payload.adt]
+tool = "scripts/make-amethyst-adt.py"
+chip_id = "0x8015"
+owned_memory_size = "0x100000000"
+cpu_regs = "0,0x100,0x200,0x300,0x400,0x500,0x600,0x700"
+unique_chip_id = "required"
