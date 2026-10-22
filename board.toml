@@ -37,8 +37,8 @@ archives = [
 
 [kernel.prelink]
 tool = "kits/NativePrelink/emit_prelink.py"
-kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_GENERIC/mach.development.generic.unstripped"
-kernelcache_sha256 = "a0bc4b92b67d58309df58dbb3e558a74e50882e34e5677b102bce0453d10de83"
+kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf"
+kernelcache_sha256 = "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7"
 slide = "-0x1000000"
 early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
 roots = [

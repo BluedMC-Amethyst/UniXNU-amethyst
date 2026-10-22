@@ -23,7 +23,7 @@ if (args.verified_root or args.negative_verified_block) and args.component != 'N
 if args.negative_verified_block and not args.verified_root:
     parser.error('The isolated input fault requires verified block mode')
 component = args.component
-recipe = ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_GENERIC/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
+recipe = ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
 record = json.loads(recipe.read_text().strip().rstrip(','))
 source = ROOT / 'drivers' / ('NativeMobileDisplay' if component in ('NativeLegacyDisplay','NativeGOPPresenter') else 'NativeMetal' if component in ('NativeOfflineGPU','NativeOfflineAccelerator','NativeIOGPUProviderProbe') else component) / {'NativeAdreno':'NativeAdrenoService.cpp'}.get(component, component + '.cpp')
 out = ROOT / 'build' / {'ArmVirtPlatform': 'armvirt-platform', 'ArmDTPlatform': 'armdt-platform', 'ArmCpu': 'armcpu', 'NativeAES': 'native-aes',
