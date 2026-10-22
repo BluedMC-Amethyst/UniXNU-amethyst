@@ -29,7 +29,7 @@ archives = [
   "scripts/build-corecrypto-14.py",
   "scripts/build-corecrypto-14.py --namespace",
   "scripts/build-arm-driver.py ArmDTPlatform",
-  "scripts/build-arm-driver.py ArmCpu",
+  # "scripts/build-arm-driver.py ArmCpu",
   "scripts/build-native-aes-bindings.py",
   "scripts/build-libpthread-kernel.py",
   "scripts/build-arm-driver.py NativeUfs",
