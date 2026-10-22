@@ -177,18 +177,27 @@ jobs:
           ./unixnu build payload "${args[@]}" -D "$GITHUB_WORKSPACE"
 
       - name: Upload kernel and payload
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: unixnu-${{ inputs.defconfig }}
+          name: unixnu-build-${{ inputs.defconfig }}
           path: |
             unixnu-core/out/*/kernel/**
             unixnu-core/out/*/payload/**
-            unixnu-core/out/*/logs/**
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unixnu-logs-${{ inputs.defconfig }}
+          path: unixnu-core/out/*/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload userdata
-        if: inputs.upload_userdata && contains(inputs.steps, 'userdata')
+        if: inputs.upload_userdata && contains(inputs.steps, 'userdata') && success()
         uses: actions/upload-artifact@v4
         with:
           name: unixnu-userdata-${{ inputs.defconfig }}
