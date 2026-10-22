@@ -5,18 +5,14 @@ description = "Xiaomi Redmi Note 14 Pro+ 5G"
 kit = "amethyst"
 
 [ipsw]
-url = "https://updates.cdn-apple.com/2023FallFCS/fullrestores/042-49498/8EBB3EC5-4819-4481-85CB-8F49BF3EFD16/iPad14,3,iPad14,4,iPad14,5,iPad14,6_17.0_21A329_Restore.ipsw"
-product = "iPad14,3"
-version = "17.0"
-build = "21A329"
-device_class = "ipad"
-chip_id = 0x8112
-board_id = 0x0
+url = "https://updates.cdn-apple.com/2025FallFCS/fullrestores/122-77006/1158E502-D76D-4226-AA06-ED5E30CD1111/iPhone10,3,iPhone10,6_16.7.16_20H392_Restore.ipsw"
+product = "iPhone10,3"
+version = "16.5"
+build = "20F66"
+device_class = "iphone"
+chip_id = 0x8015
+board_id = 0x06
 fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustCache"]
-
-[ipsw.sha256]
-"044-73541-011.dmg" = "5e2b4f9812a45c7b39df58dbb3e558a74e50882e34e5677b102bce0453d10de83"
-"044-73549-011.dmg" = "cd490bcf41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f"
 
 [userdata]
 first_lba = 0x26c000
