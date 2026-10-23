@@ -32,8 +32,11 @@ archives = [
   # "build-arm-driver.py ArmCpu",
   "build-arm-driver.py NativeAES",
   "build-native-aes-bindings.py",
+  "prepare-storage-headers.py",
+  "build-arm-driver.py NativeUfs --unverified",
+  # "build-ufs-original-bindings.py",
   "build-libpthread-kernel.py",
-  "build-arm-driver.py NativeUfs",
+  # "build-native-legacy-display.py",
 ]
 
 [kernel.prelink]
