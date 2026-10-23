@@ -99,22 +99,6 @@ jobs:
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
-      - name: Select bootstrap device
-        working-directory: ./unixnu-core
-        run: ./unixnu defconfig bootstrap_defconfig -D "$GITHUB_WORKSPACE"
-
-      - name: Build bootstrap kernel
-        working-directory: ./unixnu-core
-        run: ./unixnu build kernel -D "$GITHUB_WORKSPACE"
-
-      - name: Prepare reference candidate
-        working-directory: ./unixnu-core
-        run: |
-          echo "Copying bootstrap kernel as reference candidate..."
-          mkdir -p out/amethyst/tree/build/native-prelink
-          cp out/amethyst/kernel/kernel.macho out/amethyst/tree/build/native-prelink/native-owner-mobile-graphics-candidate.macho
-          cp out/amethyst/kernel/kernel.json out/amethyst/tree/build/native-prelink/native-owner-mobile-graphics-candidate.json
-
       - name: Select the device
         working-directory: ./unixnu-core
         run: ./unixnu defconfig "$DEFCONFIG" -D "$GITHUB_WORKSPACE"

@@ -34,7 +34,6 @@ archives = [
   "build-native-aes-bindings.py",
   "build-arm-driver.py NativeUfs",
   "build-libpthread-kernel.py",
-  # "build-native-legacy-display.py",
 ]
 
 [kernel.prelink]
