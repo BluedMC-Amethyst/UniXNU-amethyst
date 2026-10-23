@@ -40,16 +40,7 @@ slide = "-0x1000000"
 early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
 roots = [
   "com.apple.driver.AppleARMPlatform",
-  "com.apple.driver.AppleARMWatchdogTimer",
-  "com.apple.driver.AppleMobileFileIntegrity",
-  "com.apple.driver.ApplePMGR",
   "com.apple.filesystems.apfs",
-  "com.apple.iokit.IOHIDFamily",
-  "com.apple.iokit.IOStorageFamily",
-  "com.apple.kec.Libm",
-  "com.apple.kec.corecrypto",
-  "com.apple.kext.CoreTrust",
-  "com.apple.security.AppleImage4",
 ]
 extra_args = []
 
