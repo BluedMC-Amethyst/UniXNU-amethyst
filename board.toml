@@ -9,9 +9,9 @@ url = "https://updates.cdn-apple.com/2025FallFCS/fullrestores/122-77006/1158E502
 product = "iPhone10,3"
 version = "16.7.16"
 build = "20H392"
-device_class = "iphone"
+device_class = "d221ap"
 chip_id = 0x8015
-board_id = 0x06
+board_id = 0x0E
 fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustCache"]
 
 [userdata]
@@ -42,7 +42,7 @@ archives = [
 [kernel.prelink]
 tool = "kits/NativePrelink/emit_prelink.py"
 kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf"
-kernelcache_sha256 = "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7"
+kernelcache_sha256 = "2ec297bac95bcba01046fd0148e97e7e5885c05a6c18827f39f534ba375c1221"
 slide = "-0x1000000"
 early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
 roots = [
