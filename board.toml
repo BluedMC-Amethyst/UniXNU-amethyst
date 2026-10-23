@@ -31,6 +31,12 @@ archives = [
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
   "build-arm-driver.py NativeAES",
+  "build-native-aes-bindings.py",
+  "build-arm-driver.py NativeUfs",
+  "build-arm-driver.py NativeVirtioBlock",
+  "build-arm-driver.py NativeRamBlock",
+  "build-libpthread-kernel.py",
+  "build-arm-driver.py NativeAdreno",
   "build-native-legacy-display.py",
 ]
 
