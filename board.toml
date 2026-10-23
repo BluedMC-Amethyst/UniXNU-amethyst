@@ -26,12 +26,14 @@ windows = [
 [kernel]
 defconfig = "amethyst_defconfig"
 archives = [
-  "build-corecrypto-14.py",
-  "build-corecrypto-14.py --namespace",
+  # "build-corecrypto-14.py",
+  # "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
-  "build-native-aes-bindings.py",
-  "build-libpthread-kernel.py",
-  "build-arm-driver.py NativeUfs",
+  # "build-arm-driver.py ArmCpu",
+  # "build-arm-driver.py NativeAES",
+  # "build-native-aes-bindings.py",
+  # "build-libpthread-kernel.py",
+  # "build-arm-driver.py NativeUfs",
 ]
 
 [kernel.prelink]
