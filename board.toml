@@ -33,10 +33,8 @@ archives = [
   "build-arm-driver.py NativeAES",
   "build-native-aes-bindings.py",
   "build-arm-driver.py NativeUfs",
-  "build-arm-driver.py NativeVirtioBlock",
-  "build-arm-driver.py NativeRamBlock",
   "build-libpthread-kernel.py",
-  "build-native-legacy-display.py",
+  # "build-native-legacy-display.py",
 ]
 
 [kernel.prelink]
