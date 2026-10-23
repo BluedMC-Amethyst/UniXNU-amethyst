@@ -30,10 +30,6 @@ archives = [
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
-  "build-arm-driver.py NativeAES",
-  "build-native-aes-bindings.py",
-  "build-arm-driver.py NativeUfs",
-  "build-libpthread-kernel.py",
 ]
 
 [kernel.prelink]
