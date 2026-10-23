@@ -96,8 +96,8 @@ jobs:
         working-directory: ./unixnu-core
         run: |
           echo "Patching offline-component-load-probes.patch to bypass display probe..."
-          find . -name "offline-component-load-probes.patch" -exec sed -i 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
-          find . -name "offline-component-load-probes.patch" -exec sed -i 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
+          find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
+          find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
       - name: Select bootstrap device
         working-directory: ./unixnu-core
@@ -112,7 +112,6 @@ jobs:
         run: |
           echo "Copying bootstrap kernel as reference candidate..."
           mkdir -p out/amethyst/tree/build/native-prelink
-          # Копируем ядро и json
           cp out/amethyst/kernel/kernel.macho out/amethyst/tree/build/native-prelink/native-owner-mobile-graphics-candidate.macho
           cp out/amethyst/kernel/kernel.json out/amethyst/tree/build/native-prelink/native-owner-mobile-graphics-candidate.json
 
