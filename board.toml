@@ -29,14 +29,7 @@ archives = [
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
-  # "build-arm-driver.py ArmCpu",
-  "build-arm-driver.py NativeAES",
-  "build-native-aes-bindings.py",
-  "prepare-storage-headers.py",
-  "build-arm-driver.py NativeUfs --unverified",
-  # "build-ufs-original-bindings.py",
-  "build-libpthread-kernel.py",
-  # "build-native-legacy-display.py",
+  "build-arm-driver.py ArmCpu"
 ]
 
 [kernel.prelink]
@@ -47,7 +40,16 @@ slide = "-0x1000000"
 early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
 roots = [
   "com.apple.driver.AppleARMPlatform",
+  "com.apple.driver.AppleARMWatchdogTimer",
+  "com.apple.driver.AppleMobileFileIntegrity",
+  "com.apple.driver.ApplePMGR",
   "com.apple.filesystems.apfs",
+  "com.apple.iokit.IOHIDFamily",
+  "com.apple.iokit.IOStorageFamily",
+  "com.apple.kec.Libm",
+  "com.apple.kec.corecrypto",
+  "com.apple.kext.CoreTrust",
+  "com.apple.security.AppleImage4",
 ]
 extra_args = []
 
