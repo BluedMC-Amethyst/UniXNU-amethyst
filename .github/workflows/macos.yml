@@ -7,53 +7,33 @@ on:
         description: Defconfig name
         required: true
         default: amethyst_defconfig
-      steps:
-        description: Steps to run
-        type: choice
-        options:
-          - kernel
-          - kernel payload
-          - kernel userdata payload
-        default: kernel
+      build_payload:
+        description: "Build Payload"
+        type: boolean
+        default: true
+      build_userdata:
+        description: "Build Userdata (takes ~16GB disk)"
+        type: boolean
+        default: false
+      build_bootimg:
+        description: "Build UEFI & Boot Image (requires dtb_url)"
+        type: boolean
+        default: false
+      dtb_url:
+        description: "URL to live.dtb (required if build_bootimg is checked)"
+        required: false
+        default: ""
+      unique_chip_id:
+        description: "Unique Chip ID (hex, e.g., 0x1234567890abcdef)"
+        required: false
+        default: "0x1234567890abcdef"
       xcode:
-        description: Xcode version of the macos-26 image
+        description: Xcode version
         required: true
         default: "26.6"
-      ipsw_url:
-        description: IPSW URL (empty uses board.toml)
-        required: false
-        default: ""
-      trust_cache_url:
-        description: Trust cache bundle URL (optional)
-        required: false
-        default: ""
-      owner_trust_cache:
-        description: Treat the trust cache URL as an owner-signed bundle
-        type: boolean
-        default: false
-      data_seed_url:
-        description: Data seed URL (optional)
-        required: false
-        default: ""
-      grow_gib:
-        description: Grow the Data seed to this many GiB (optional)
-        required: false
-        default: ""
-      skip_setup:
-        description: Mark Setup as done in the Data seed
-        type: boolean
-        default: false
-      upload_userdata:
-        description: Upload the userdata image (large)
-        type: boolean
-        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: macos-build-${{ github.ref }}-${{ inputs.defconfig }}
-  cancel-in-progress: false
 
 env:
   HOMEBREW_NO_AUTO_UPDATE: 1
@@ -67,7 +47,6 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_${{ inputs.xcode }}.app/Contents/Developer
       DEFCONFIG: ${{ inputs.defconfig }}
-      STEPS: ${{ inputs.steps }}
     steps:
       - name: Check out Device Repo
         uses: actions/checkout@v4
@@ -97,7 +76,6 @@ jobs:
       - name: Patch offline component probes
         working-directory: ./unixnu-core
         run: |
-          echo "Patching offline-component-load-probes.patch to bypass display probe..."
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
@@ -109,7 +87,7 @@ jobs:
           chmod +x "$DEVICE_DIR/scripts/ci-bootstrap-candidate.sh"
           bash "$DEVICE_DIR/scripts/ci-bootstrap-candidate.sh"
 
-      - name: Prepare the device
+      - name: Select the device
         working-directory: ./unixnu-core
         run: ./unixnu defconfig "$DEFCONFIG" -D "$GITHUB_WORKSPACE"
 
@@ -119,47 +97,57 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./unixnu build kernel -D "$GITHUB_WORKSPACE"
 
+      - name: Build payload
+        if: inputs.build_payload
+        working-directory: ./unixnu-core
+        run: |
+          ./unixnu build payload --unique-chip-id "${{ inputs.unique_chip_id }}" -D "$GITHUB_WORKSPACE"
+
       - name: Build userdata
-        if: contains(inputs.steps, 'userdata')
+        if: inputs.build_userdata
         working-directory: ./unixnu-core
         run: ./unixnu build userdata -D "$GITHUB_WORKSPACE"
 
-      - name: Build payload
-        if: contains(inputs.steps, 'payload')
-        working-directory: ./unixnu-core
-        env:
-          UNIXNU_UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
-          SKIP_SETUP: ${{ inputs.skip_setup }}
-          OWNER_TRUST_CACHE: ${{ inputs.owner_trust_cache }}
+      - name: Download DTB
+        if: inputs.build_bootimg
         run: |
-          args=()
-          if [ -f "$RUNNER_TEMP/trustcache" ]; then
-            if [ "$OWNER_TRUST_CACHE" = true ]; then
-              args+=(--owner-trust-cache "$RUNNER_TEMP/trustcache")
-            else
-              args+=(--trust-cache "$RUNNER_TEMP/trustcache")
-            fi
+          if [ -z "${{ inputs.dtb_url }}" ]; then
+            echo "::error::DTB URL is required to build boot.img!"
+            exit 1
           fi
-          if [ -f "$RUNNER_TEMP/data.dbr" ]; then args+=(--data-ramdisk "$RUNNER_TEMP/data.dbr"); fi
-          if [ "$SKIP_SETUP" = true ]; then args+=(--skip-setup); fi
-          ./unixnu build payload "${args[@]}" -D "$GITHUB_WORKSPACE"
+          echo "Downloading DTB from ${{ inputs.dtb_url }}"
+          curl -fL "${{ inputs.dtb_url }}" -o "$GITHUB_WORKSPACE/live.dtb"
 
-      - name: Upload compiled binaries
-        if: success() && inputs.steps != 'kernel'
+      - name: Check out UEFI Repository
+        if: inputs.build_bootimg
+        uses: actions/checkout@v4
+        with:
+          repository: BluedMC-Amethyst/uefi-amethyst
+          ref: amethyst
+          path: uefi-amethyst
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build firmware
+        if: inputs.build_bootimg
+        working-directory: ./unixnu-core
+        run: ./unixnu build firmware --uefi "$GITHUB_WORKSPACE/uefi-amethyst" -D "$GITHUB_WORKSPACE"
+
+      - name: Build boot image
+        if: inputs.build_bootimg
+        working-directory: ./unixnu-core
+        run: |
+          ./unixnu bootimg --uefi "$GITHUB_WORKSPACE/uefi-amethyst" --dtb "$GITHUB_WORKSPACE/live.dtb" -D "$GITHUB_WORKSPACE"
+
+      - name: Upload compiled binaries and logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unixnu-build-${{ inputs.defconfig }}
           path: |
-            unixnu-core/out/*/kernel/**
-            unixnu-core/out/*/payload/**
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unixnu-logs-${{ inputs.defconfig }}-${{ github.run_attempt }}
-          path: unixnu-core/out/*/logs/*.log
+            unixnu-core/out/**/kernel/**
+            unixnu-core/out/**/payload/**
+            unixnu-core/out/**/userdata/**
+            unixnu-core/out/**/boot/**
+            unixnu-core/out/**/logs/*.log
           if-no-files-found: warn
           retention-days: 7
