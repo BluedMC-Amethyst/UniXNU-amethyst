@@ -4,30 +4,38 @@ import json
 import csv
 from pathlib import Path
 import re
-import subprocess
+import struct
 import tomllib
+import fdt
 
-PLATFORM = Path('uefi-amethyst/Platforms/Xiaomi/amethystPkg')
-DTB = Path('build/amethyst/amethyst.dtb')
+ROOT = Path(__file__).resolve().parents[1]
+PLATFORM = ROOT / 'uefi-amethyst/Platforms/Xiaomi/amethystPkg'
+DTB = ROOT / 'uefi-amethyst/Resources/DTBs/amethyst.dtb'
 
 
-def cells(node, prop):
-    result = subprocess.run(['fdtget', '-t', 'x', str(DTB), node, prop],
-                            capture_output=True, text=True)
-    if result.returncode:
+def get_reserved_memory_reservations(dtb_path):
+    if not dtb_path.is_file():
         return []
-    return [int(word, 16) for word in result.stdout.split()]
+    with open(dtb_path, 'rb') as f:
+        parsed_dt = fdt.parse_dtb(f.read())
+    reservations = []
+    reserved_node = parsed_dt.get_node('reserved-memory')
+    if reserved_node:
+        for node in reserved_node.nodes:
+            prop = node.get_property('reg')
+            if prop:
+                raw = prop.data
+                ints = [struct.unpack('>I', raw[i:i+4])[0] for i in range(0, len(raw), 4)]
+                for i in range(0, len(ints), 4):
+                    if i + 3 < len(ints):
+                        base = (ints[i] << 32) | ints[i+1]
+                        size = (ints[i+2] << 32) | ints[i+3]
+                        reservations.append((node.name, base, size))
+    return reservations
 
 
 if __name__ == '__main__':
-    nodes = subprocess.check_output(['fdtget', '-l', str(DTB), '/reserved-memory'], text=True).split()
-    reservations = []
-    for node in nodes:
-        values = cells('/reserved-memory/' + node, 'reg')
-        for index in range(0, len(values), 4):
-            base = (values[index] << 32) | values[index + 1]
-            size = (values[index + 2] << 32) | values[index + 3]
-            reservations.append((node, base, size))
+    reservations = get_reserved_memory_reservations(DTB)
     source = (PLATFORM / 'Library/MemoryMapLib/MemoryMapLib.c').read_text()
     rows = [(m[1], int(m[2], 16), int(m[3], 16), m[4]) for m in re.finditer(
         r'\{"([^"]+)"\s*,\s*(0x[0-9a-fA-F]+),\s*(0x[0-9a-fA-F]+),([^}]+)\}', source)]
@@ -44,7 +52,7 @@ if __name__ == '__main__':
         for other, other_base, other_size, _ in rows[index + 1:]:
             if max(base, other_base) < min(base + size, other_base + other_size):
                 errors.append(f'Overlapping intervals: {name}, {other}')
-    config = tomllib.loads(Path('uefi-amethyst/Resources/Configs/amethyst.toml').read_text())
+    config = tomllib.loads((ROOT / 'uefi-amethyst/Resources/Configs/amethyst.toml').read_text())
     fd = config['uefi_fd']
     if not any(n == 'UEFI FD' and a == fd['base'] and s == fd['size'] for n, a, s, _ in rows):
         errors.append('FD configuration does not match memory descriptor')
@@ -55,8 +63,8 @@ if __name__ == '__main__':
     dependencies = set()
     for inc in (PLATFORM / 'Include').glob('*.inc'):
         dependencies.update(re.findall(r'Binaries/amethyst/[^\s}]+', inc.read_text()))
-    missing = sorted(p for p in dependencies if not (Path('uefi-amethyst') / p).is_file())
-    firmware = Path('.cache/firmware/amethyst/uefiplat.cfg')
+    missing = sorted(p for p in dependencies if not (ROOT / 'uefi-amethyst' / p).is_file())
+    firmware = ROOT / '.cache/firmware/amethyst/uefiplat.cfg'
     stock_count = 0
     if firmware.exists():
         text = firmware.read_text().split('[MemoryMap]', 1)[1].split('[RegisterMap]', 1)[0]
@@ -82,7 +90,8 @@ if __name__ == '__main__':
               'stock_regions_checked': stock_count,
               'static_errors': errors, 'missing_vendor_inputs': missing,
               'runtime_ram_verified': False, 'hardware_boot_demonstrated': False}
-    Path('build/amethyst/check.json').write_text(json.dumps(result, indent=2) + '\n')
+    (ROOT / 'build/amethyst').mkdir(parents=True, exist_ok=True)
+    (ROOT / 'build/amethyst/check.json').write_text(json.dumps(result, indent=2) + '\n')
     print(f'{len(reservations)} DTS reservations checked against {len(rows)} descriptors')
     print(f'{len(errors)} static errors; {len(missing)} vendor inputs still missing; hardware unverified')
     for error in errors:

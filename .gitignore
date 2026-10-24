@@ -22,6 +22,7 @@ __pycache__/
 *.dSYM/
 
 # Inputs, images and products that never belong in Git
+uefi-amethyst
 *.ipsw
 *.dmg
 *.im4p
