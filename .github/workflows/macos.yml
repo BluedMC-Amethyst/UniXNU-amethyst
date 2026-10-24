@@ -71,6 +71,8 @@ jobs:
     steps:
       - name: Check out Device Repo
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Check out UniXNU Core
         uses: actions/checkout@v4
