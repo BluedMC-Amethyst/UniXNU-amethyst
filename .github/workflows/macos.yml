@@ -94,7 +94,7 @@ jobs:
             echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
           fi
 
-      name: Patch offline component probes
+      - name: Patch offline component probes
         working-directory: ./unixnu-core
         run: |
           echo "Patching offline-component-load-probes.patch to bypass display probe..."
