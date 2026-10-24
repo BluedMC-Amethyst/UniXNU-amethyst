@@ -35,12 +35,13 @@ archives = [
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
   "build-libpthread-kernel.py",
+  "build-amethyst-platform-power.py",
   "build-arm-driver.py NativeUfs",
   "build-ufs-original-bindings.py --candidate build/native-prelink/bootstrap-candidate.macho",
   "build-arm-driver.py NativeAES",
   "build-native-aes-bindings.py",
   "build-arm-driver.py NativeRamBlock",
-  # "build-native-legacy-display.py",
+  "build-native-legacy-display.py",
 ]
 
 [kernel.prelink]
