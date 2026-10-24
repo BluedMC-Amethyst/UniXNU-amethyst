@@ -101,7 +101,6 @@ jobs:
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
-
       - name: Select the device
         working-directory: ./unixnu-core
         run: ./unixnu defconfig "$DEFCONFIG" -D "$GITHUB_WORKSPACE"
