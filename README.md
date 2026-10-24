@@ -2,8 +2,6 @@
 
 UniXNU device support for the Xiaomi Redmi Note 14 Pro+ 5G (codename: `amethyst`, SoC: `SM7635`)
 
-**Target OS:** iPhone X (`iPhone10,3`) userland, iOS 16.5 (20F66).
-
 **Status:** Bring-up / Waiting for UEFI.
 
 ## Bring-up progress:
