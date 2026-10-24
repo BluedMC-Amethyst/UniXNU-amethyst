@@ -5,3 +5,7 @@
 	path = drivers/NativeUfs
 	url = https://github.com/rootstockos/NativeUfs.git
 	branch = fix/unverified-build
+[submodule "uefi-amethyst"]
+	path = uefi-amethyst
+	url = https://github.com/BluedMC-Amethyst/uefi-amethyst.git
+	branch = amethyst
