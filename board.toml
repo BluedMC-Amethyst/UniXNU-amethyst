@@ -34,6 +34,7 @@ archives = [
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
+  "build-arm-driver.py NativeUfs",
 ]
 
 [kernel.prelink]
