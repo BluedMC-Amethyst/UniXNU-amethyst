@@ -101,7 +101,15 @@ jobs:
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
           find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
-      - name: Select the device
+      - name: Build bootstrap candidate
+        working-directory: ./unixnu-core
+        env:
+          DEVICE_DIR: ${{ github.workspace }}
+        run: |
+          chmod +x "$DEVICE_DIR/scripts/ci-bootstrap-candidate.sh"
+          bash "$DEVICE_DIR/scripts/ci-bootstrap-candidate.sh"
+
+      - name: Prepare the device
         working-directory: ./unixnu-core
         run: ./unixnu defconfig "$DEFCONFIG" -D "$GITHUB_WORKSPACE"
 
