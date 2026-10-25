@@ -20,7 +20,7 @@ on:
         type: boolean
         default: false
       dtb_url:
-        description: "URL to live.dtb (required if build_bootimg is checked)"
+        description: "URL to live.dtb (optional; defaults to amethyst DTB)"
         required: false
         default: ""
       unique_chip_id:
@@ -108,15 +108,27 @@ jobs:
         working-directory: ./unixnu-core
         run: ./unixnu build userdata -D "$GITHUB_WORKSPACE"
 
+
       - name: Download DTB
         if: inputs.build_bootimg
+        env:
+          DTB_URL: ${{ inputs.dtb_url }}
         run: |
-          if [ -z "${{ inputs.dtb_url }}" ]; then
-            echo "::error::DTB URL is required to build boot.img!"
+          DEFAULT_DTB_URL="https://raw.githubusercontent.com/BluedMC-Amethyst/uefi-amethyst/refs/heads/amethyst/Resources/DTBs/amethyst.dtb"
+          if [ -z "$DTB_URL" ]; then
+            DTB_URL="$DEFAULT_DTB_URL"
+            echo "No DTB URL provided. Using default Amethyst DTB."
+          else
+            echo "Using custom DTB URL."
+          fi
+          echo "Downloading DTB..."
+          curl --fail --location --retry 3 "$DTB_URL" \
+            --output "$GITHUB_WORKSPACE/live.dtb"
+          if [ ! -s "$GITHUB_WORKSPACE/live.dtb" ]; then
+            echo "::error::Downloaded DTB is empty!"
             exit 1
           fi
-          echo "Downloading DTB from ${{ inputs.dtb_url }}"
-          curl -fL "${{ inputs.dtb_url }}" -o "$GITHUB_WORKSPACE/live.dtb"
+          echo "DTB downloaded successfully."
 
       - name: Check out UEFI Repository
         if: inputs.build_bootimg
