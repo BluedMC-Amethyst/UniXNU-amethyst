@@ -15,18 +15,6 @@ on:
         description: "Build Userdata (takes ~16GB disk)"
         type: boolean
         default: false
-      build_bootimg:
-        description: "Build UEFI & Boot Image (requires dtb_url)"
-        type: boolean
-        default: false
-      dtb_url:
-        description: "URL to live.dtb (optional; defaults to amethyst DTB)"
-        required: false
-        default: ""
-      unique_chip_id:
-        description: "Unique Chip ID (hex, e.g., 0x1234567890abcdef)"
-        required: false
-        default: "0x1234567890abcdef"
       xcode:
         description: Xcode version
         required: true
@@ -47,6 +35,7 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_${{ inputs.xcode }}.app/Contents/Developer
       DEFCONFIG: ${{ inputs.defconfig }}
+
     steps:
       - name: Check out Device Repo
         uses: actions/checkout@v4
@@ -101,53 +90,12 @@ jobs:
         if: inputs.build_payload
         working-directory: ./unixnu-core
         run: |
-          ./unixnu build payload --unique-chip-id "${{ inputs.unique_chip_id }}" -D "$GITHUB_WORKSPACE"
+          ./unixnu build payload -D "$GITHUB_WORKSPACE"
 
       - name: Build userdata
         if: inputs.build_userdata
         working-directory: ./unixnu-core
         run: ./unixnu build userdata -D "$GITHUB_WORKSPACE"
-
-      - name: Download DTB
-        if: inputs.build_bootimg
-        env:
-          DTB_URL: ${{ inputs.dtb_url }}
-        run: |
-          DEFAULT_DTB_URL="https://raw.githubusercontent.com/BluedMC-Amethyst/uefi-amethyst/refs/heads/amethyst/Resources/DTBs/amethyst.dtb"
-          if [ -z "$DTB_URL" ]; then
-            DTB_URL="$DEFAULT_DTB_URL"
-            echo "No DTB URL provided. Using default Amethyst DTB."
-          else
-            echo "Using custom DTB URL."
-          fi
-          echo "Downloading DTB..."
-          curl --fail --location --retry 3 "$DTB_URL" \
-            --output "$GITHUB_WORKSPACE/live.dtb"
-          if [ ! -s "$GITHUB_WORKSPACE/live.dtb" ]; then
-            echo "::error::Downloaded DTB is empty!"
-            exit 1
-          fi
-          echo "DTB downloaded successfully."
-
-      - name: Check out UEFI Repository
-        if: inputs.build_bootimg
-        uses: actions/checkout@v4
-        with:
-          repository: BluedMC-Amethyst/uefi-amethyst
-          ref: amethyst
-          path: uefi-amethyst
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build firmware
-        if: inputs.build_bootimg
-        working-directory: ./unixnu-core
-        run: ./unixnu build firmware --uefi "$GITHUB_WORKSPACE/uefi-amethyst" -D "$GITHUB_WORKSPACE"
-
-      - name: Build boot image
-        if: inputs.build_bootimg
-        working-directory: ./unixnu-core
-        run: |
-          ./unixnu bootimg --uefi "$GITHUB_WORKSPACE/uefi-amethyst" --dtb "$GITHUB_WORKSPACE/live.dtb" -D "$GITHUB_WORKSPACE"
 
       - name: Upload compiled binaries and logs
         if: always()
@@ -158,7 +106,6 @@ jobs:
             unixnu-core/out/**/kernel/**
             unixnu-core/out/**/payload/**
             unixnu-core/out/**/userdata/**
-            unixnu-core/out/**/boot/**
             unixnu-core/out/**/logs/*.log
           if-no-files-found: warn
           retention-days: 7
