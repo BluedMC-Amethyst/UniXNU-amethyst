@@ -108,7 +108,6 @@ jobs:
         working-directory: ./unixnu-core
         run: ./unixnu build userdata -D "$GITHUB_WORKSPACE"
 
-
       - name: Download DTB
         if: inputs.build_bootimg
         env:
