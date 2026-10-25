@@ -37,7 +37,7 @@ archives = [
   "build-libpthread-kernel.py",
   # "build-amethyst-platform-power.py",
   "build-arm-driver.py NativeUfs",
-  "build-ufs-original-bindings.py --candidate build/native-prelink/bootstrap-candidate.macho",
+  "build-ufs-original-bindings.py --candidate build/xnu-prelink/bootstrap-candidate.macho",
   "build-arm-driver.py NativeAES",
   "build-native-aes-bindings.py",
   "build-arm-driver.py NativeRamBlock",
@@ -45,7 +45,7 @@ archives = [
 ]
 
 [kernel.prelink]
-tool = "kits/NativePrelink/emit_prelink.py"
+tool = "kits/XnuPrelink/emit_prelink.py"
 kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf"
 kernelcache_sha256 = "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7"
 slide = "-0x1000000"
