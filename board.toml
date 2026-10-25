@@ -89,9 +89,7 @@ extra_args = []
 config = "amethyst"
 dsc = "Platforms/Xiaomi/amethystPkg/amethyst.dsc"
 fd = "Build/amethystPkg/{target}_CLANGPDB/FV/SILICIUM_UEFI.fd"
-# preflight = ["scripts/check-amethyst.py"]
 submodules = ["Common/Mu", "Common/Mu_OEM_Sample", "Silicium-ACPI", "Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl"]
-patches = ["Resources/MuPatches/Gic-Spurious.patch"]
 packages = [
   "{uefi}",
   "{uefi}/Platforms/Xiaomi",
