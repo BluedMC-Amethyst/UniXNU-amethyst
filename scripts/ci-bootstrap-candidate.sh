@@ -23,14 +23,6 @@ heartbeat() {
 heartbeat &
 beat=$!
 trap 'kill "$beat" 2>/dev/null || true' EXIT
-# The A810 firmware, from board.toml's one pinned source; checked against its pins. The workflow's last step deletes
-# device/.cache/firmware.
-# stage "fetch the A810 firmware"
-# python3 "$device/scripts/fetch-amethyst-gpu-firmware.py"
-# The pinned linux sources for the GMU register header (sparse checkout in device/.cache/linux-a8xx); the archive step
-# generates the tree's copy from the same inputs.
-# stage "fetch the pinned linux sources for the GMU header"
-# python3 "$device/scripts/prepare-amethyst-gmu.py" --fetch
 stage "build and prelink the bootstrap kernel (from scratch: about an hour)"
 ./unixnu defconfig bootstrap_defconfig -D "$device"
 ./unixnu build kernel -D "$device"
