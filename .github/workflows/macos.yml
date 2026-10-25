@@ -89,6 +89,8 @@ jobs:
       - name: Build payload
         if: inputs.build_payload
         working-directory: ./unixnu-core
+        env:
+          UNIXNU_UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
         run: |
           ./unixnu build payload -D "$GITHUB_WORKSPACE"
 
