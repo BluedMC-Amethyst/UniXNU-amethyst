@@ -10,29 +10,31 @@ Device port of [UniXNU](https://github.com/UniXNU/UniXNU) for the Xiaomi Redmi N
 | Architecture | ARM64 |
 | Device repository | [andr0d1v/UniXNU-amethyst](https://github.com/andr0d1v/UniXNU-amethyst) |
 | UEFI repository | [BluedMC-Amethyst/uefi-amethyst](https://github.com/BluedMC-Amethyst/uefi-amethyst/tree/amethyst) |
-| Status | **Bring-up / Awaiting UEFI support** |
+| Status | **Early bring-up — build pipeline available, hardware boot unverified** |
 
 ## Bring-up status
 
-The port is currently in the early bring-up stage. The build environment and kernel compilation pipeline are available, while hardware boot and subsequent stages depend on a working UEFI implementation for `amethyst`.
+The port has a working build pipeline for the device-specific UEFI firmware and is progressing through kernel and payload preparation. An experimental boot image was generated and tested with fastboot boot, but UniXNU did not reach a confirmed runtime milestone. The device was subsequently restored to its previous Android installation.
+
+No successful UniXNU boot has been verified on the target hardware.
 
 | Stage | Component | Status | Objective |
 |---|---|---|---|
-| 1 | UEFI | ⏳ Blocked | Boot the UniXNU application and obtain framebuffer or serial output |
-| 2 | UniXNU bootstrap | ⏳ Blocked | Initialize the bootstrap environment, parse configuration and report driver/patch counts |
-| 3 | Payload | 🟡 Prepared | Load payload files, validate hashes and locate the ADT sidecar |
-| 4 | DarwinBoot | ⏳ Blocked | Validate the kernel, ADT and trust cache; emit `DARWINBOOT:` diagnostics |
-| 5 | XNU kernel | 🟡 Build pipeline ready | Enter the XNU kernel, reach the platform expert and validate the ADT root |
-| 6 | Storage and root filesystem | ⏳ Blocked | Initialize storage, publish the userdata device and mount the expected root filesystem |
-| 7 | Userland | ⏳ Blocked | Start `launchd` and reach a visible SpringBoard state |
+| 1 | UEFI | 🟡 Build completed | Firmware image generated; verify execution on hardware and obtain serial or framebuffer output |
+| 2 | UniXNU bootstrap | 🟡 Build pipeline prepared | Confirm bootstrap execution and collect diagnostics |
+| 3 | Payload | 🟡 Image generated / prepared | Verify payload files, hashes and ADT sidecar at runtime |
+| 4 | DarwinBoot | ⏳ Unverified | Capture DARWINBOOT: diagnostics and confirm validation succeeds |
+| 5 | XNU kernel | 🟡 Build pipeline available | Confirm kernel entry, platform expert initialization and ADT root discovery |
+| 6 | Storage and root filesystem | ⏳ Unverified | Verify storage initialization, device publication and root mounting |
+| 7 | Userland | ⏳ Unverified | Verify launchd startup and a visible SpringBoard state |
 
 **Status legend**
 
 - ✅ Working — verified on the target device.
-- 🟡 Prepared — configuration or build infrastructure exists, but runtime functionality is not yet verified.
-- ⏳ Blocked / pending — depends on earlier stages or missing hardware support.
+- 🟡 Build/preparation complete — artifacts or infrastructure exist, but runtime behavior is not confirmed.
+- ⏳ Unverified — no successful runtime evidence yet.
 
-> Successful compilation does not imply successful boot on the target device. Stage completion should be based on runtime evidence, preferably serial logs.
+> Successful compilation does not establish that the firmware can execute on the device or that the kernel can boot. Stage completion requires runtime evidence, preferably serial logs.
 
 ## Build instructions
 
@@ -146,14 +148,18 @@ The userdata image may require approximately 16 GB of additional disk space.
 
 ## Current blockers
 
-- UEFI support for `amethyst` is not yet available in the required state; the port is awaiting the relevant SILICIUM implementation.
-- Runtime validation of the UniXNU bootstrap and DarwinBoot is pending a successful UEFI boot.
-- Kernel entry, storage initialization, root filesystem mounting and userland startup remain unverified.
+- **UEFI runtime:** The firmware builds, but successful execution on amethyst has not been demonstrated.
+- **Boot image validation:** The experimental image was rejected by the device's boot path or failed to progress into a confirmed UniXNU runtime. The precise failure stage remains undetermined.
+- **Bootstrap and DarwinBoot:** Runtime diagnostics are unavailable until the early boot path is confirmed.
+- **XNU entry:** Kernel compilation does not yet establish that XNU executes on the target device.
+- **Hardware support:** Storage, display, input, power management and other platform functionality remain unverified.
+
+## Next milestone
+
+Establish a reproducible early-boot path and capture diagnostic output before attempting to validate later stages. Keep build artifacts and runtime observations separate in status reports; do not mark a stage as working based on compilation alone.
 
 ## Contributing and debugging
 
 When reporting bring-up progress, include the relevant build output or serial log and identify the stage at which execution stops.
 
 A successful compilation is useful progress, but hardware initialization and runtime behavior must be verified independently.
-
-The immediate milestone is to obtain a working UEFI boot path for `amethyst`, allowing the remaining stages to be tested incrementally.
