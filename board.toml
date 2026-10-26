@@ -113,6 +113,13 @@ MEMORY_PROTECTION = "TRUE"
 SHIP_MODE = "FALSE"
 BUILDID_STRING = "amethyst-research"
 
+[bootimg.image]
+base = 0x0
+kernel_offset = 0x8000
+tags_offset = 0x1e00000
+pagesize = 4096
+header_version = 0
+
 [payload]
 volume = "AMETHYSTESP"
 size_mib = 128
