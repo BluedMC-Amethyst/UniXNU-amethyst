@@ -51,6 +51,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check out UEFI repo
+        if: inputs.build_payload
         uses: actions/checkout@v4
         with:
           repository: BluedMC-Amethyst/uefi-amethyst.git
