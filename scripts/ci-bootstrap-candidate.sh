@@ -5,7 +5,7 @@
 # candidate for build-ufs-original-bindings.py, then selects amethyst_defconfig again for the real build.
 # The same two passes as Allenwdk/UniXNU-uke's build-kernel workflow.
 set -euo pipefail
-device=../UniXNU-amethyst
+device=${DEVICE_DIR:?DEVICE_DIR is the device repository}
 # Format 2 builds each defconfig in its own directory (out/<device>/<os_profile>/<config>/, with its own tree); format 1 shares
 # out/amethyst. outdir prints the selected configuration's directory.
 outdir() { ./unixnu status --json -D "$device" | python3 -c 'import json,sys; print(json.load(sys.stdin)["output"])'; }
