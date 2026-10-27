@@ -50,6 +50,14 @@ jobs:
           path: unixnu-core
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check out UEFI repo
+        uses: actions/checkout@v4
+        with:
+          repository: BluedMC-Amethyst/uefi-amethyst.git
+          ref: amethyst
+          path: uefi-amethyst
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -61,12 +69,6 @@ jobs:
             brew install unifdef
             echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
           fi
-
-      - name: Patch offline component probes
-        working-directory: ./unixnu-core
-        run: |
-          find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
-          find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
       - name: Build bootstrap candidate
         working-directory: ./unixnu-core
@@ -92,7 +94,7 @@ jobs:
         env:
           UNIXNU_UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
         run: |
-          ./unixnu build payload -D "$GITHUB_WORKSPACE"
+          ./unixnu build payload --uefi uefi-amethyst --edk2 uefi-amethyst/Mu_Basecore -D "$GITHUB_WORKSPACE"
 
       - name: Build userdata
         if: inputs.build_userdata

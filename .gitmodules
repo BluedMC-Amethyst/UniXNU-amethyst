@@ -1,7 +1,4 @@
-[submodule "drivers/NativeMobileDisplay"]
-	path = drivers/NativeMobileDisplay
-	url = https://github.com/Allenwdk/NativeMobileDisplay.git
-[submodule "drivers/NativeUfs"]
-	path = drivers/NativeUfs
-	url = https://github.com/andr0d1v/NativeUfs.git
-	branch = fix/unverified-build
+[submodule "drivers/ShengUfs"]
+	path = drivers/ShengUfs
+	url = https://github.com/andr0d1v/NativeUfs
+	branch = amethyst

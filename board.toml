@@ -1,22 +1,15 @@
+schema_version = 2
+
 [board]
 name = "amethyst"
 soc = "SM7635"
-description = "Xiaomi Redmi Note 14 Pro+ 5G"
+soc_source = "sm7635"
+os_profile = "ipados-17.7.11-21H461"
+description = "Xiaomi Redmi Note 14 Pro+"
 kit = "amethyst"
 
-[ipsw]
-url = "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw"
-product = "iPad7,1"
-version = "17.7.11"
-build = "21H461"
-device_class = "j120ap"
-chip_id = 0x8011
-board_id = 12
-fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustCache"]
-
-[ipsw.sha256]
-"044-76040-038.dmg" = "3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d"
-"044-76034-038.dmg" = "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f"
+[components]
+include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "RamBlock", "XnuPrelink", "DarwinBoot", "AppleKeyStoreState", "ShengUfs"]#, "Sm7635Platform"]
 
 [userdata]
 first_lba = 0x26c000
@@ -29,62 +22,26 @@ windows = [
 
 [kernel]
 defconfig = "amethyst_defconfig"
+config_fragments = ["arch:configs/common.config", "soc:configs/sm7635.config", "os:configs/ipados.config"]
+patch_series = ["arch:patches/xnu/series", "soc:patches/xnu/series", "os:patches/xnu/series", "device:patches/xnu/series"]
 archives = [
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
-  "build-arm-driver.py ArmDTPlatform",
-  "build-arm-driver.py ArmCpu",
+  "component:ArmDTPlatform",
+  "component:ArmCpu",
   "build-libpthread-kernel.py",
-  # "build-amethyst-platform-power.py",
-  "build-arm-driver.py NativeUfs",
+  "component:ShengUfs",
   "build-ufs-original-bindings.py --candidate build/xnu-prelink/bootstrap-candidate.macho",
-  "build-arm-driver.py NativeAES",
+  "component:SoftwareAES",
   "build-native-aes-bindings.py",
-  "build-arm-driver.py NativeRamBlock",
+  "component:RamBlock",
   "build-mockfs-fixture.py",
-  # "build-native-legacy-display.py",
+  "component:AppleKeyStoreState",
 ]
 
-[kernel.prelink]
-tool = "kits/XnuPrelink/emit_prelink.py"
-kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf"
-kernelcache_sha256 = "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7"
-slide = "-0x1000000"
-early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
-roots = [
-  "com.apple.AppleFSCompression.AppleFSCompressionTypeZlib",
-  "com.apple.driver.AppleARMPlatform",
-  "com.apple.driver.AppleARMWatchdogTimer",
-  "com.apple.driver.AppleAudioClockLibs",
-  "com.apple.driver.AppleEffaceableStorage",
-  "com.apple.driver.AppleIISController",
-  "com.apple.driver.AppleM2ScalerCSCDriver",
-  "com.apple.driver.AppleMobileFileIntegrity",
-  "com.apple.driver.ApplePMGR",
-  "com.apple.driver.IODARTFamily",
-  "com.apple.filesystems.apfs",
-  "com.apple.iokit.CoreAnalyticsFamily",
-  "com.apple.iokit.IOAVFamily",
-  "com.apple.iokit.IOAudio2Family",
-  "com.apple.iokit.IOCECFamily",
-  "com.apple.iokit.IOCryptoAcceleratorFamily",
-  "com.apple.iokit.IOGPUFamily",
-  "com.apple.iokit.IOHDCPFamily",
-  "com.apple.iokit.IOMobileGraphicsFamily",
-  "com.apple.iokit.IOReportFamily",
-  "com.apple.iokit.IOSlowAdaptiveClockingFamily",
-  "com.apple.iokit.IOStorageFamily",
-  "com.apple.iokit.IOSurface",
-  "com.apple.kec.Libm",
-  "com.apple.kec.corecrypto",
-  "com.apple.kext.AppleMatch",
-  "com.apple.kext.CoreTrust",
-  "com.apple.security.AppleImage4",
-  "com.apple.security.sandbox",
-  "com.apple.iokit.IOHIDFamily",
-  "com.apple.iokit.IOHIDEventDriver",
-]
-extra_args = []
+[device_tree]
+source = "device:dts/amethyst.dts"
+include_dirs = ["soc:dts"]
 
 [firmware]
 config = "amethyst"
@@ -107,11 +64,11 @@ packages = [
 ]
 
 [firmware.defines]
-ENABLE_SECUREBOOT = "1"
 DEVICE_MODEL = "amethyst"
+ENABLE_SECUREBOOT = "0"
 MEMORY_PROTECTION = "TRUE"
 SHIP_MODE = "FALSE"
-BUILDID_STRING = "amethyst-research"
+BUILDID_STRING = "amethyst-bringup"
 
 [bootimg.image]
 base = 0x0
@@ -122,21 +79,26 @@ header_version = 0
 
 [payload]
 volume = "AMETHYSTESP"
-size_mib = 128
+size_mib = 80
 loader = "firmware"
-title = "UniXNU for Redmi Note 14 Pro+ 5G"
-dram_size = "0x200000000"
+title = "iPadOS for amethyst"
+dram_size = "0x1FFE00000"
+panic_screen = true
 kernel_args = [
   "-v",
   "serial=3",
   "debug=0x14e",
+  "-enable_kprintf_spam",
+  "native-ufs-allow-unverified=1",
+  "offline-apfs-load=1",
+  "-apfs_shared_datavolume",
+  "sheng-data-persist=2",
 ]
 
 [payload.adt]
-tool = "scripts/make-amethyst-adt.py"
-chip_id = "0x8015"
-owned_memory_size = "0x100000000"
-cpu_regs = "0,0x100,0x200,0x300,0x400,0x500,0x600,0x700"
-ipad_identity = false
-iphone_identity = true
+chip_id = "207"
 unique_chip_id = "required"
+root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
+packed_data_ramdisk = true
+persistent_data = true
+owned_memory_size = "0x130000000"

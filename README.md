@@ -83,17 +83,43 @@ bash "../UniXNU-amethyst/scripts/ci-bootstrap-candidate.sh"
 ./unixnu build kernel -D ../UniXNU-amethyst
 ```
 
-### 6. Build the payload
+### 6. Clone the UEFI repository
+
+```bash
+git clone --recurse-submodules \
+  --branch amethyst \
+  https://github.com/BluedMC-Amethyst/uefi-amethyst.git \
+  ../uefi-amethyst
+```
+
+If the repository already exists, update it instead:
+
+```bash
+git -C ../uefi-amethyst pull --recurse-submodules
+git -C ../uefi-amethyst submodule update --init --recursive
+```
+
+### 7. Build the payload
 
 ```bash
 ./unixnu build payload \
   --unique-chip-id 0x1234567890abcdef \
+  --uefi ../uefi-amethyst \
+  --edk2 ../uefi-amethyst/Mu_Basecore \
   -D ../UniXNU-amethyst
 ```
 
 Replace the example chip identifier with the appropriate value for your setup when required.
 
-### 7. Download the device tree blob (DTB)
+### 8. Build the firmware
+
+```bash
+./unixnu build firmware \
+  --uefi ../uefi-amethyst \
+  -D ../UniXNU-amethyst
+```
+
+### 9. Download the device tree blob (DTB)
 
 ```bash
 curl -fL \
@@ -101,35 +127,11 @@ curl -fL \
   -o "../UniXNU-amethyst/live.dtb"
 ```
 
-### 8. Clone the UEFI repository
-
-```bash
-git clone --recurse-submodules \
-  --branch amethyst \
-  https://github.com/BluedMC-Amethyst/uefi-amethyst.git \
-  ../UniXNU-amethyst/uefi-amethyst
-```
-
-If the repository already exists, update it instead:
-
-```bash
-git -C ../UniXNU-amethyst/uefi-amethyst pull --recurse-submodules
-git -C ../UniXNU-amethyst/uefi-amethyst submodule update --init --recursive
-```
-
-### 9. Build the firmware
-
-```bash
-./unixnu build firmware \
-  --uefi ../UniXNU-amethyst/uefi-amethyst \
-  -D ../UniXNU-amethyst
-```
-
 ### 10. Build the boot image
 
 ```bash
 ./unixnu bootimg \
-  --uefi ../UniXNU-amethyst/uefi-amethyst \
+  --uefi ../uefi-amethyst \
   --dtb ../UniXNU-amethyst/live.dtb \
   -D ../UniXNU-amethyst
 ```

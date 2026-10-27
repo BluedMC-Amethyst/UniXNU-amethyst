@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile the generic platform expert against the actual source-kernel ABI."""
 # UniXNU's scripts/build-arm-driver.py (BSD-2-Clause-Patent) with two amethyst changes: a driver this device repository
-# carries as a fork under its old name (drivers/NativeUfs, drivers/NativeMobileDisplay) is compiled from that fork, and
+# carries as a fork under its old name (drivers/NativeMobileDisplay; format 2 keeps drivers/ShengUfs at its catalog path) is compiled from that fork, and
 # NativeUfs is built without the verified-root check (see the NativeUfs block below). Outputs keep the catalog's paths.
 import argparse
 import json
@@ -35,6 +35,14 @@ if (args.verified_root or args.negative_verified_block) and args.component != 'N
 if args.negative_verified_block and not args.verified_root:
     parser.error('The isolated input fault requires verified block mode')
 component = args.component
+# amethyst: format 2 builds every selected component's recipe. A driver whose configuration switch is off is linked by
+# nothing (format 1 never built it), so its recipe is skipped: the GPU driver's code goes into the display archive instead,
+# and there is no VirtIO block device.
+import os, sys
+switch = {'NativeAdreno': 'XNU_NATIVE_ADRENO', 'NativeVirtioBlock': 'XNU_NATIVE_VIRTIO_BLOCK'}.get(component)
+if switch and os.environ.get(switch) == '0':
+    print(f'build-arm-driver: {identifier} skipped ({switch} is off)')
+    sys.exit(0)
 recipe = ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
 record = json.loads(recipe.read_text().strip().rstrip(','))
 directory = 'GopFramebuffer' if runtime in ('NativeLegacyDisplay', 'NativeGOPPresenter') else 'AdrenoMetal' if runtime in ('NativeOfflineGPU', 'NativeOfflineAccelerator', 'NativeIOGPUProviderProbe') else identifier
@@ -96,7 +104,7 @@ if component in ('NativeVirtioBlock', 'NativeRamBlock', 'NativeUfs'):
         command += ['-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
 if component == 'NativeUfs':
     # amethyst: the verified-root bundle (owner keys and signed volume policies) is not built yet, so NativeUfs (our fork,
-    # rootstockos/NativeUfs fix/unverified-build) is built without NATIVE_VERIFIED_BLOCK; the kernel reads the root
+    # rootstockos/NativeUfs amethyst) is built without NATIVE_VERIFIED_BLOCK; the kernel reads the root
     # with native-ufs-allow-unverified=1.
     command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/VirtioMmioBlock'),
                 '-mgeneral-regs-only']
