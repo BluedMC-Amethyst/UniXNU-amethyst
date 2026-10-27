@@ -8,23 +8,24 @@ Device port of [UniXNU](https://github.com/UniXNU/UniXNU) for the Xiaomi Redmi N
 | Codename | `amethyst` |
 | SoC | `SM7635` |
 | Architecture | ARM64 |
-| Device repository | [andr0d1v/UniXNU-amethyst](https://github.com/andr0d1v/UniXNU-amethyst) |
+| Device repository | [BluedMC-Amethyst/UniXNU-amethyst](https://github.com/BluedMC-Amethyst/UniXNU-amethyst) |
 | UEFI repository | [BluedMC-Amethyst/uefi-amethyst](https://github.com/BluedMC-Amethyst/uefi-amethyst/tree/amethyst) |
-| Status | **Early bring-up — build pipeline available, hardware boot unverified** |
+| Status | **Early bring-up — XNU executes through MMU enable** |
 
 ## Bring-up status
 
-The port has a working build pipeline for the device-specific UEFI firmware and is progressing through kernel and payload preparation. An experimental boot image was generated and tested with fastboot boot, but UniXNU did not reach a confirmed runtime milestone. The device was subsequently restored to its previous Android installation.
-
-No successful UniXNU boot has been verified on the target hardware.
+The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
+UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
+XNU reaches its post-MMU entry probe. The current hang is inside
+`_arm_vm_init`, before `_vm_set_page_size` returns.
 
 | Stage | Component | Status | Objective |
 |---|---|---|---|
-| 1 | UEFI | 🟡 Build completed | Firmware image generated; verify execution on hardware and obtain serial or framebuffer output |
-| 2 | UniXNU bootstrap | 🟡 Build pipeline prepared | Confirm bootstrap execution and collect diagnostics |
-| 3 | Payload | 🟡 Image generated / prepared | Verify payload files, hashes and ADT sidecar at runtime |
-| 4 | DarwinBoot | ⏳ Unverified | Capture DARWINBOOT: diagnostics and confirm validation succeeds |
-| 5 | XNU kernel | 🟡 Build pipeline available | Confirm kernel entry, platform expert initialization and ADT root discovery |
+| 1 | UEFI | ✅ Working | Boots through RAM-only `fastboot boot` with stock Amethyst ClockDxe |
+| 2 | UniXNU bootstrap | ✅ Working | Menu and input work on hardware |
+| 3 | Payload | ✅ Working | Embedded FAT payload mounts and `unixnu.toml` is parsed |
+| 4 | DarwinBoot | ✅ Working | Inputs validate and `ExitBootServices` completes |
+| 5 | XNU kernel | 🟡 Early execution | Entry, pre-MMU and post-MMU probes pass; `_arm_vm_init` currently hangs |
 | 6 | Storage and root filesystem | ⏳ Unverified | Verify storage initialization, device publication and root mounting |
 | 7 | Userland | ⏳ Unverified | Verify launchd startup and a visible SpringBoard state |
 
@@ -54,7 +55,7 @@ git clone --recurse-submodules \
   https://github.com/UniXNU/UniXNU.git
 
 git clone --recurse-submodules \
-  https://github.com/andr0d1v/UniXNU-amethyst.git
+  https://github.com/BluedMC-Amethyst/UniXNU-amethyst.git
 ```
 
 ### 2. Enter the UniXNU core repository
@@ -138,6 +139,12 @@ curl -fL \
 
 The boot-image stage requires a valid DTB and a compatible UEFI implementation.
 
+Amethyst's Android header-v4 bootloader exposes the installed vendor ramdisk
+instead of the generic ramdisk supplied to `fastboot boot`. Until the embedded
+payload support is upstream, use UniXNU commit `b29a1d4` from branch
+`bluekyeet/unixnu-amethyst:amethyst-embedded-payload` together with UEFI branch
+`BluedMC-Amethyst/uefi-amethyst:amethyst` at or after `daf306bf`.
+
 ## Optional build targets
 
 ### Build userdata
@@ -150,15 +157,14 @@ The userdata image may require approximately 16 GB of additional disk space.
 
 ## Current blockers
 
-- **UEFI runtime:** The firmware builds, but successful execution on amethyst has not been demonstrated.
-- **Boot image validation:** The experimental image was rejected by the device's boot path or failed to progress into a confirmed UniXNU runtime. The precise failure stage remains undetermined.
-- **Bootstrap and DarwinBoot:** Runtime diagnostics are unavailable until the early boot path is confirmed.
-- **XNU entry:** Kernel compilation does not yet establish that XNU executes on the target device.
+- **XNU VM initialization:** `_arm_vm_init` does not return; the next probe is
+  inside its early Mach-O and boot-argument processing.
 - **Hardware support:** Storage, display, input, power management and other platform functionality remain unverified.
 
 ## Next milestone
 
-Establish a reproducible early-boot path and capture diagnostic output before attempting to validate later stages. Keep build artifacts and runtime observations separate in status reports; do not mark a stage as working based on compilation alone.
+Localize and fix the `_arm_vm_init` hang, then restore panic rendering and
+continue to platform-expert initialization.
 
 ## Contributing and debugging
 
