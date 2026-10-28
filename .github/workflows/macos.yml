@@ -54,7 +54,7 @@ jobs:
         if: inputs.build_payload
         uses: actions/checkout@v4
         with:
-          repository: BluedMC-Amethyst/uefi-amethyst.git
+          repository: IOS4Amethyst/uefi-amethyst.git
           ref: amethyst
           path: uefi-amethyst
           token: ${{ secrets.GITHUB_TOKEN }}

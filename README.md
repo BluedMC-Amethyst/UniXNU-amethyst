@@ -8,8 +8,8 @@ Device port of [UniXNU](https://github.com/UniXNU/UniXNU) for the Xiaomi Redmi N
 | Codename | `amethyst` |
 | SoC | `SM7635` |
 | Architecture | ARM64 |
-| Device repository | [BluedMC-Amethyst/UniXNU-amethyst](https://github.com/BluedMC-Amethyst/UniXNU-amethyst) |
-| UEFI repository | [BluedMC-Amethyst/uefi-amethyst](https://github.com/BluedMC-Amethyst/uefi-amethyst/tree/amethyst) |
+| Device repository | [IOS4Amethyst/UniXNU-amethyst](https://github.com/IOS4Amethyst/UniXNU-amethyst) |
+| UEFI repository | [IOS4Amethyst/uefi-amethyst](https://github.com/IOS4Amethyst/uefi-amethyst/tree/amethyst) |
 | Status | **Early bring-up — XNU executes through MMU enable** |
 
 ## Bring-up status
@@ -55,7 +55,7 @@ git clone --recurse-submodules \
   https://github.com/UniXNU/UniXNU.git
 
 git clone --recurse-submodules \
-  https://github.com/BluedMC-Amethyst/UniXNU-amethyst.git
+  https://github.com/IOS4Amethyst/UniXNU-amethyst.git
 ```
 
 ### 2. Enter the UniXNU core repository
@@ -89,7 +89,7 @@ bash "../UniXNU-amethyst/scripts/ci-bootstrap-candidate.sh"
 ```bash
 git clone --recurse-submodules \
   --branch amethyst \
-  https://github.com/BluedMC-Amethyst/uefi-amethyst.git \
+  https://github.com/IOS4Amethyst/uefi-amethyst.git \
   ../uefi-amethyst
 ```
 
@@ -124,7 +124,7 @@ Replace the example chip identifier with the appropriate value for your setup wh
 
 ```bash
 curl -fL \
-  "https://raw.githubusercontent.com/BluedMC-Amethyst/uefi-amethyst/refs/heads/amethyst/Resources/DTBs/amethyst.dtb" \
+  "https://raw.githubusercontent.com/IOS4Amethyst/uefi-amethyst/refs/heads/amethyst/Resources/DTBs/amethyst.dtb" \
   -o "../UniXNU-amethyst/live.dtb"
 ```
 
@@ -142,8 +142,8 @@ The boot-image stage requires a valid DTB and a compatible UEFI implementation.
 Amethyst's Android header-v4 bootloader exposes the installed vendor ramdisk
 instead of the generic ramdisk supplied to `fastboot boot`. Until the embedded
 payload support is upstream, use UniXNU commit `b29a1d4` from branch
-`bluekyeet/unixnu-amethyst:amethyst-embedded-payload` together with UEFI branch
-`BluedMC-Amethyst/uefi-amethyst:amethyst` at or after `daf306bf`.
+`IOS4Amethyst/UniXNU:amethyst-embedded-payload` together with UEFI branch
+`IOS4Amethyst/uefi-amethyst:amethyst` at or after `4e6782ba`.
 
 ## Optional build targets
 
