@@ -69,7 +69,7 @@ cd UniXNU
 ```bash
 chmod +x "../UniXNU-amethyst/scripts/ci-bootstrap-candidate.sh"
 
-bash "../UniXNU-amethyst/scripts/ci-bootstrap-candidate.sh"
+DEVICE_DIR=../UniXNU-amethyst bash "../UniXNU-amethyst/scripts/ci-bootstrap-candidate.sh"
 ```
 
 ### 4. Configure the device
