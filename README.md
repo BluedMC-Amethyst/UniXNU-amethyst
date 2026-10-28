@@ -10,14 +10,17 @@ Device port of [UniXNU](https://github.com/UniXNU/UniXNU) for the Xiaomi Redmi N
 | Architecture | ARM64 |
 | Device repository | [IOS4Amethyst/UniXNU-amethyst](https://github.com/IOS4Amethyst/UniXNU-amethyst) |
 | UEFI repository | [IOS4Amethyst/uefi-amethyst](https://github.com/IOS4Amethyst/uefi-amethyst/tree/amethyst) |
-| Status | **Early bring-up — XNU executes through MMU enable** |
+| Status | **Kernel bring-up — text console works; root device is the current boundary** |
 
 ## Bring-up status
 
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
-XNU reaches its post-MMU entry probe. The current hang is inside
-`_arm_vm_init`, before `_vm_set_page_size` returns.
+XNU starts its scheduler, enters IOKit and reaches root mounting. The physical
+GOP text console is visible on hardware. A guarded ApplePMGR provider satisfies
+AMFI without advertising unimplemented power operations. The current panic is
+`Failed to mount root device`; a compatible root image is not part of the
+RAM-only test.
 
 | Stage | Component | Status | Objective |
 |---|---|---|---|
@@ -25,8 +28,8 @@ XNU reaches its post-MMU entry probe. The current hang is inside
 | 2 | UniXNU bootstrap | ✅ Working | Menu and input work on hardware |
 | 3 | Payload | ✅ Working | Embedded FAT payload mounts and `unixnu.toml` is parsed |
 | 4 | DarwinBoot | ✅ Working | Inputs validate and `ExitBootServices` completes |
-| 5 | XNU kernel | 🟡 Early execution | Entry, pre-MMU and post-MMU probes pass; `_arm_vm_init` currently hangs |
-| 6 | Storage and root filesystem | ⏳ Unverified | Verify storage initialization, device publication and root mounting |
+| 5 | XNU kernel | ✅ Working | VM, scheduler, first context switch, IOKit, text console and AMFI/PMGR path pass |
+| 6 | Storage and root filesystem | 🟡 Mount boundary reached | XNU attempts root mounting; provide and validate the configured userdata root |
 | 7 | Userland | ⏳ Unverified | Verify launchd startup and a visible SpringBoard state |
 
 **Status legend**
@@ -41,18 +44,24 @@ XNU reaches its post-MMU entry probe. The current hang is inside
 
 ### Prerequisites
 
-- macOS with a compatible Xcode installation.
-- Homebrew.
+- Linux with the UniXNU open-source Mach-O toolchain, or macOS with Xcode.
 - Git with recursive submodule support.
-- The Xcode version expected by the UniXNU build environment.
+- Python 3.11+, mtools and dtc.
+
+On Linux, install the toolchain once from the UniXNU checkout:
+
+```bash
+sudo scripts/linux/setup-toolchain.py -j "$(nproc)"
+scripts/linux/setup-toolchain.py --check
+```
 
 The commands below assume that both repositories are cloned into sibling directories and that all build commands are executed from the UniXNU core repository.
 
 ### 1. Clone the repositories
 
 ```bash
-git clone --recurse-submodules \
-  https://github.com/UniXNU/UniXNU.git
+git clone --recurse-submodules --branch amethyst-embedded-payload \
+  https://github.com/IOS4Amethyst/UniXNU.git
 
 git clone --recurse-submodules \
   https://github.com/IOS4Amethyst/UniXNU-amethyst.git
@@ -142,7 +151,7 @@ The boot-image stage requires a valid DTB and a compatible UEFI implementation.
 Amethyst's Android header-v4 bootloader exposes the installed vendor ramdisk
 instead of the generic ramdisk supplied to `fastboot boot`. Until the embedded
 payload support is upstream, use UniXNU branch
-`IOS4Amethyst/UniXNU:amethyst-embedded-payload` at or after `3ef9721` together
+`IOS4Amethyst/UniXNU:amethyst-embedded-payload` at or after `20437c1` together
 with UEFI branch `IOS4Amethyst/uefi-amethyst:amethyst` at or after `4e6782ba`.
 
 ## Optional build targets
@@ -157,14 +166,18 @@ The userdata image may require approximately 16 GB of additional disk space.
 
 ## Current blockers
 
-- **XNU VM initialization:** `_arm_vm_init` does not return; the next probe is
-  inside its early Mach-O and boot-argument processing.
-- **Hardware support:** Storage, display, input, power management and other platform functionality remain unverified.
+- **Root filesystem:** the RAM-only image reaches `Failed to mount root device`.
+  Build and validate the configured userdata root before testing launchd.
+- **Power management:** the ApplePMGR bridge only publishes the provider AMFI
+  requires. Unimplemented power operations deliberately panic rather than touch
+  unqualified registers.
+- **Hardware support:** full display presentation, input, suspend, GPU and other
+  board services remain unverified.
 
 ## Next milestone
 
-Localize and fix the `_arm_vm_init` hang, then restore panic rendering and
-continue to platform-expert initialization.
+Provide the root filesystem, verify UFS publication and mount the configured OS
+volume. Keep root/userdata work separate from RAM-only kernel bring-up.
 
 ## Contributing and debugging
 
