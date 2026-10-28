@@ -122,7 +122,7 @@ jobs:
         if: inputs.build_bootimg
         uses: actions/checkout@v4
         with:
-          repository: BluedMC-Amethyst/uefi-amethyst
+          repository: IOS4Amethyst/uefi-amethyst
           ref: amethyst
           path: uefi-amethyst
           token: ${{ secrets.GITHUB_TOKEN }}
