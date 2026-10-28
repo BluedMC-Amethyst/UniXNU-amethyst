@@ -7,7 +7,7 @@
 	path = kits/AdrenoFirmware
 	url = https://github.com/IOS4Amethyst/AdrenoFirmware
 	branch = amethyst
-[submodule "ArmDTPlatform"]
-	path = ArmDTPlatform
+[submodule "drivers/ArmDTPlatform"]
+	path = drivers/ArmDTPlatform
 	url = https://github.com/IOS4Amethyst/ArmDTPlatform
 	branch = amethyst
