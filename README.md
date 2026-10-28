@@ -141,9 +141,9 @@ The boot-image stage requires a valid DTB and a compatible UEFI implementation.
 
 Amethyst's Android header-v4 bootloader exposes the installed vendor ramdisk
 instead of the generic ramdisk supplied to `fastboot boot`. Until the embedded
-payload support is upstream, use UniXNU commit `b29a1d4` from branch
-`IOS4Amethyst/UniXNU:amethyst-embedded-payload` together with UEFI branch
-`IOS4Amethyst/uefi-amethyst:amethyst` at or after `4e6782ba`.
+payload support is upstream, use UniXNU branch
+`IOS4Amethyst/UniXNU:amethyst-embedded-payload` at or after `3ef9721` together
+with UEFI branch `IOS4Amethyst/uefi-amethyst:amethyst` at or after `4e6782ba`.
 
 ## Optional build targets
 
