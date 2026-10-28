@@ -1,0 +1,6 @@
+# The SoC profile this board selects (board.toml [board] soc_source).
+[[source]]
+name = "sm7635"
+kind = "soc"
+git = "https://github.com/rootstockos/UniXNU-sm7635-common"
+commit = "c9e36f6da28e0264b3148f7d4ed9de5f3d96ce42"

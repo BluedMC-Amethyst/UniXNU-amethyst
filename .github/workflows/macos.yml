@@ -15,18 +15,6 @@ on:
         description: "Build Userdata (takes ~16GB disk)"
         type: boolean
         default: false
-      build_bootimg:
-        description: "Build UEFI & Boot Image (requires dtb_url)"
-        type: boolean
-        default: false
-      dtb_url:
-        description: "URL to live.dtb (required if build_bootimg is checked)"
-        required: false
-        default: ""
-      unique_chip_id:
-        description: "Unique Chip ID (hex, e.g., 0x1234567890abcdef)"
-        required: false
-        default: "0x1234567890abcdef"
       xcode:
         description: Xcode version
         required: true
@@ -47,6 +35,7 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_${{ inputs.xcode }}.app/Contents/Developer
       DEFCONFIG: ${{ inputs.defconfig }}
+
     steps:
       - name: Check out Device Repo
         uses: actions/checkout@v4
@@ -61,6 +50,15 @@ jobs:
           path: unixnu-core
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check out UEFI repo
+        if: inputs.build_payload
+        uses: actions/checkout@v4
+        with:
+          repository: IOS4Amethyst/uefi-amethyst.git
+          ref: amethyst
+          path: uefi-amethyst
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -72,12 +70,6 @@ jobs:
             brew install unifdef
             echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
           fi
-
-      - name: Patch offline component probes
-        working-directory: ./unixnu-core
-        run: |
-          find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_probe();/\/\/ native_legacy_display_probe();/g' {} +
-          find . -name "offline-component-load-probes.patch" -exec sed -i '' 's/native_legacy_display_late_probe();/\/\/ native_legacy_display_late_probe();/g' {} +
 
       - name: Build bootstrap candidate
         working-directory: ./unixnu-core
@@ -100,43 +92,15 @@ jobs:
       - name: Build payload
         if: inputs.build_payload
         working-directory: ./unixnu-core
+        env:
+          UNIXNU_UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
         run: |
-          ./unixnu build payload --unique-chip-id "${{ inputs.unique_chip_id }}" -D "$GITHUB_WORKSPACE"
+          ./unixnu build payload --uefi uefi-amethyst --edk2 uefi-amethyst/Mu_Basecore -D "$GITHUB_WORKSPACE"
 
       - name: Build userdata
         if: inputs.build_userdata
         working-directory: ./unixnu-core
         run: ./unixnu build userdata -D "$GITHUB_WORKSPACE"
-
-      - name: Download DTB
-        if: inputs.build_bootimg
-        run: |
-          if [ -z "${{ inputs.dtb_url }}" ]; then
-            echo "::error::DTB URL is required to build boot.img!"
-            exit 1
-          fi
-          echo "Downloading DTB from ${{ inputs.dtb_url }}"
-          curl -fL "${{ inputs.dtb_url }}" -o "$GITHUB_WORKSPACE/live.dtb"
-
-      - name: Check out UEFI Repository
-        if: inputs.build_bootimg
-        uses: actions/checkout@v4
-        with:
-          repository: IOS4Amethyst/uefi-amethyst
-          ref: amethyst
-          path: uefi-amethyst
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build firmware
-        if: inputs.build_bootimg
-        working-directory: ./unixnu-core
-        run: ./unixnu build firmware --uefi "$GITHUB_WORKSPACE/uefi-amethyst" -D "$GITHUB_WORKSPACE"
-
-      - name: Build boot image
-        if: inputs.build_bootimg
-        working-directory: ./unixnu-core
-        run: |
-          ./unixnu bootimg --uefi "$GITHUB_WORKSPACE/uefi-amethyst" --dtb "$GITHUB_WORKSPACE/live.dtb" -D "$GITHUB_WORKSPACE"
 
       - name: Upload compiled binaries and logs
         if: always()
@@ -147,7 +111,6 @@ jobs:
             unixnu-core/out/**/kernel/**
             unixnu-core/out/**/payload/**
             unixnu-core/out/**/userdata/**
-            unixnu-core/out/**/boot/**
             unixnu-core/out/**/logs/*.log
           if-no-files-found: warn
           retention-days: 7
