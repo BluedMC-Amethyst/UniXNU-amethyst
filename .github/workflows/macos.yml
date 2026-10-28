@@ -56,8 +56,8 @@ jobs:
       - name: Check out UniXNU Core
         uses: actions/checkout@v4
         with:
-          repository: UniXNU/UniXNU
-          ref: main
+          repository: IOS4Amethyst/UniXNU
+          ref: amethyst-embedded-payload
           path: unixnu-core
           token: ${{ secrets.GITHUB_TOKEN }}
 
