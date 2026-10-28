@@ -9,7 +9,7 @@ description = "Xiaomi Redmi Note 14 Pro+"
 kit = "amethyst"
 
 [components]
-include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "RamBlock", "XnuPrelink", "DarwinBoot", "AppleKeyStoreState", "ShengUfs"]#, "Sm7635Platform"]
+include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "RamBlock", "XnuPrelink", "DarwinBoot", "AppleKeyStoreState", "AdrenoFirmware", "ShengUfs"]#, "Sm7635Platform"]
 
 [userdata]
 first_lba = 0x26c000
