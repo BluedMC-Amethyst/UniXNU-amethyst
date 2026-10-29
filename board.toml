@@ -13,7 +13,9 @@ include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "RamBlock", "XnuPrelink", "
 
 [userdata]
 first_lba = 0x26c000
-last_lba = 0x3b1fffa
+# Redmi Note 14 Pro+ 5G (amethyst) GPT captured by the read-only inspector:
+# /dev/block/sda33 spans 2539520..124477434 in 4096-byte LBAs.
+last_lba = 0x76b5ffa
 lba_bytes = 4096
 windows = [
   { name = "OS", component = "OS" },
