@@ -1,7 +1,7 @@
 
 [submodule "drivers/ShengUfs"]
 	path = drivers/ShengUfs
-	url = https://github.com/andr0d1v/NativeUfs
+	url = https://github.com/IOS4Amethyst/NativeUfs.git
 	branch = amethyst
 [submodule "kits/AdrenoFirmware"]
 	path = kits/AdrenoFirmware

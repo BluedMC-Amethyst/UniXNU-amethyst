@@ -14,6 +14,17 @@ Device port of [UniXNU](https://github.com/UniXNU/UniXNU) for the Xiaomi Redmi N
 
 ## Bring-up status
 
+### Split-device storage safety
+
+`unixnu` is preferred for root reads, with `userdata` fallback only when no
+`unixnu` entry exists. On split devices, persistent Data and log/export opens
+are disabled: Android userdata is F2FS, not a safe raw-write region. The
+Partitioner's `reserve_mib` currently leaves an unallocated tail above unixnu;
+it does **not** reserve blocks inside Android userdata. Do not run Apply based
+on the earlier claim that this gap protects sheng persistence. A dedicated,
+validated persistence allocation and reviewed device-write plan are still needed.
+Host parser and store/log refusal tests pass; hardware writes are untested.
+
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
 XNU starts its scheduler, enters IOKit and reaches root mounting. The physical
