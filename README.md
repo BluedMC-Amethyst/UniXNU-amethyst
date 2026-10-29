@@ -24,6 +24,19 @@ it does **not** reserve blocks inside Android userdata. Do not run Apply based
 on the earlier claim that this gap protects sheng persistence. A dedicated,
 validated persistence allocation and reviewed device-write plan are still needed.
 Host parser and store/log refusal tests pass; hardware writes are untested.
+Board defaults explicitly set `sheng-data-persist=0`, `sheng-log=0`, and
+`payload.adt.persistent_data=false`; the driver guard is defense in depth.
+
+Host build evidence (2026-10-30): `./unixnu build kernel -D ../UniXNU-amethyst
+-j 8` completed, including ShengUfs `71eeacb` and prelink. Output relative to
+UniXNU: `out/amethyst/ipados-17.7.11-21H461/amethyst/kernel/kernel.macho`, SHA-256
+`4cbec82154b2a9f229ea265246055a07dc4bd46e7cc42e8b5ff979215818c25a`.
+The unchanged Static/System trust-cache modules fetched with `./unixnu ipsw
+fetch` produced `out/ipsw/21H461/original-static-system.bundle`, SHA-256
+`7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7`, matching
+the OS profile allow-list. Payload preflight stops on the missing platform seed
+(`--unique-chip-id`); a compatible Data seed is also still absent. No new boot
+image or hardware validation is claimed.
 
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and

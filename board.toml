@@ -97,7 +97,8 @@ kernel_args = [
   "native-ufs-allow-unverified=1",
   "offline-apfs-load=1",
   "-apfs_shared_datavolume",
-  "sheng-data-persist=2",
+  "sheng-data-persist=0",
+  "sheng-log=0",
 ]
 
 [payload.adt]
@@ -105,5 +106,5 @@ chip_id = "207"
 unique_chip_id = "required"
 root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
 packed_data_ramdisk = true
-persistent_data = true
+persistent_data = false
 owned_memory_size = "0x130000000"
