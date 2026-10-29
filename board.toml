@@ -94,6 +94,7 @@ kernel_args = [
   "-enable_kprintf_spam",
   "-textconsole",
   "sheng-pmgr=2",
+  "native-ufs-root=1",
   "native-ufs-allow-unverified=1",
   "offline-apfs-load=1",
   "-apfs_shared_datavolume",

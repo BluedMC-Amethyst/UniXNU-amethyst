@@ -50,6 +50,20 @@ Payload assembly passes with the device UEFI path and original trust bundle:
 It has no Data seed and is not a userland-ready image. Boot-image packaging and
 hardware testing remain pending; preserve the kernel87 firmware baseline.
 
+UFS argument audit: the prior candidate omitted the upstream-required
+`native-ufs-root=1`; `native-ufs-allow-unverified=1` does not enable the driver.
+Board defaults now explicitly request root mode; `scripts/check-adt-spmi.py`
+also checks root mode, CONFIG_XNU_NATIVE_UFS and persistence-off policy.
+The corrected payload SHA-256 is
+`d4842795b33c79aa97b55989166c7ed5ee3cca5d14b66289e6e0f559ff8b0cec`.
+A separate host-packed kernel-only test preserves the exact kernel87 shim,
+firmware FD and firmware DTB; image SHA-256
+`f32ddd6e74a3c490b9f4abb4b84319277d14391806f5224b3c8a394c494cc05b`.
+Its packed configuration and decompressed payload were verified. This does not
+establish controller ownership, DMA/command correctness, root UUID validity,
+root mounting, or userland on Amethyst. Those remain hardware/input milestones,
+not satisfied by build success. No partition writes or hardware boot performed.
+
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
 XNU starts its scheduler, enters IOKit and reaches root mounting. The physical
