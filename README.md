@@ -38,6 +38,18 @@ the OS profile allow-list. Payload preflight stops on the missing platform seed
 (`--unique-chip-id`); a compatible Data seed is also still absent. No new boot
 image or hardware validation is claimed.
 
+Follow-up payload assembly reused the existing kernel87 ADT platform seed
+privately (not committed). Data is optional for this kernel-only test. The
+board now omits PMIC/RTC ADT export markers: their SPMI-local registers cannot
+be flattened into MMIO, and no corresponding driver is selected. The controller
+still exports its real MMIO resources; hardware descriptions are retained.
+`scripts/check-adt-spmi.py ../UniXNU <compiled-hardware.dtb>` checks this policy.
+Payload assembly passes with the device UEFI path and original trust bundle:
+`out/amethyst/ipados-17.7.11-21H461/amethyst/payload/payload.img` (80 MiB), SHA-256
+`824a06ce29f514befefd9331d8f21287e410bb46713325373048736ac116e25e`.
+It has no Data seed and is not a userland-ready image. Boot-image packaging and
+hardware testing remain pending; preserve the kernel87 firmware baseline.
+
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
 XNU starts its scheduler, enters IOKit and reaches root mounting. The physical

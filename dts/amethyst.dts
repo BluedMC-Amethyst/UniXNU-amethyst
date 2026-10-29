@@ -24,3 +24,10 @@
 &cpu7 { unixnu,cluster-type = "P"; };
 
 &ufs { status = "okay"; };
+
+// No SPMI PMIC/RTC driver is selected. These reg values are bus-local IDs,
+// not MMIO ranges; the current ADT exporter only supports MMIO peripherals.
+// Keep the SoC description, but do not flatten these children into arm-io.
+// ponytail: export them when ADT bus-local addressing and its driver exist.
+&pmk8550 { /delete-property/ unixnu,adt-name; };
+&pmk8550_rtc { /delete-property/ unixnu,adt-name; };
