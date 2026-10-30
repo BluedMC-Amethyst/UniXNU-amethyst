@@ -48,3 +48,16 @@ exclusive ownership or provide rollback after a later failure.
 - New candidates' retained framebuffer does not isolate UFS as the stall cause.
 
 No new hardware candidate should be published as a porting success on this basis.
+
+## Queue failure quarantine follow-up
+
+Queue-stop timeout, descriptor-address readback failure and queue-start timeout
+now poison the transport and clear readiness; subsequent stop/start calls refuse
+before MMIO. `tests/RootQueueFailure.cpp` exercises production `RootQueue.h`
+under ASan/UBSan: busy firmware is untouched, all three failures quarantine,
+and retry writes nothing. PASS. This does not restore firmware queue/SMMU state.
+
+Full kernel build and prelink: PASS with the same command above; updated kernel
+SHA-256 `14ac7f50dec39bb834883c32d94f088e15bbfafbc87145dfd72df4cead34ec8e`.
+Hardware status is unchanged: takeover disabled by default, stall cause unknown,
+no new phone image or device test performed.
