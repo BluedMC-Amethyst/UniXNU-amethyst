@@ -7,7 +7,7 @@ import tomllib
 device = pathlib.Path(__file__).resolve().parents[1]
 board = tomllib.loads((device / 'board.toml').read_text())
 args = board['payload']['kernel_args']
-for key, value in [('native-ufs-root', '1'), ('sheng-data-persist', '0'), ('sheng-log', '0')]:
+for key, value in [('native-ufs-root', '0'), ('sheng-data-persist', '0'), ('sheng-log', '0')]:
     assert [a for a in args if a.startswith(key + '=')] == [key + '=' + value]
 assert board['payload']['adt']['persistent_data'] is False
 assert board['payload']['panic_screen'] is False, 'Keep kernel87 native entry path; binary panic patch also inserts MMU probes'
@@ -29,4 +29,5 @@ assert any(n.strings('unixnu,adt-name') == ['spmi'] for n in exports)
 for entry in exports:
     hardware_properties(entry, handles)
 print('PASS: SPMI controller exports valid MMIO; PMIC/RTC bus-local regs remain unexported')
-print('PASS: UFS root enabled exactly once; persistent Data/log and ADT persistence disabled')
+assert not any(a.startswith('native-ufs-probe=') for a in args)
+print('PASS: unqualified UFS takeover/probes and persistent Data/log disabled by default')

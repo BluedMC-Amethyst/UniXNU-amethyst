@@ -14,6 +14,11 @@ Device port of [UniXNU](https://github.com/UniXNU/UniXNU) for the Xiaomi Redmi N
 
 ## Bring-up status
 
+**Current safety override:** automatic UFS takeover is disabled
+(`native-ufs-root=0`, no probe argument). Earlier root-enabled candidates stalled
+on hardware and are not qualified. See [UFS audit](UFS-AUDIT.md) for source
+evidence, remaining ownership/DMA requirements, and host-only test limits.
+
 ### Split-device storage safety
 
 `unixnu` is preferred for root reads, with `userdata` fallback only when no
