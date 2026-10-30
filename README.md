@@ -88,6 +88,19 @@ The FAT kernel matches the prelinked kernel exactly (no binary entry probes).
 This requires execution to reach console creation; hardware console recovery
 and the underlying green-screen stall remain unverified.
 
+Offline pre-console audit found `/arm-io/ranges` parent base zero in the new
+exporter versus `0x01000000` in kernel87. XNU's `pe_arm_get_soc_base_phys()`
+returns that field, and `pe_identify_machine()` returns immediately if it is
+zero, skipping clock-frequency initialization. `payload.adt.arm_io_base` now
+restores the nonzero kernel87 base; exported MMIO regs are correspondingly
+relative, preserving their physical addresses. UniXNU's
+`scripts/check-adt-io-base.py <hardware.dtb>` verifies every translated range
+and rejects underflow. Payload rebuild and packed-image round-trip passed;
+candidate SHA-256:
+`fe7d3bc13d585f8931f0d2f4376f5354b8a9b905ad730b519ab6dbc582f867bb`.
+This fixes a confirmed early platform-initialization mismatch, not proof of a
+complete explanation for the hardware stall. Hardware validation is pending.
+
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
 XNU starts its scheduler, enters IOKit and reaches root mounting. The physical

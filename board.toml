@@ -105,6 +105,8 @@ kernel_args = [
 ]
 
 [payload.adt]
+# XNU uses zero as the no-SoC sentinel; kernel87 used this nonzero parent base.
+arm_io_base = "0x01000000"
 chip_id = "207"
 unique_chip_id = "required"
 root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
