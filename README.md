@@ -75,6 +75,19 @@ SHA-256 `707b4f59ec4a4e12bb56d4dcb57be3ecb931937bb1261c139e27bd27e2c5b2ce`.
 This removes a verified baseline difference; causation and successful hardware
 boot remain unproven. No claim that the stall is definitively fixed.
 
+Source-console follow-up: `patches/xnu/early-text-console.patch` makes
+`PE_create_console()` honor `-textconsole` before the later `vcattach()` path.
+`scripts/check-source-console.py <patched-XNU-source> <owned-output-dir>`
+executes that production function with host stubs for all display/argument
+combinations. Kernel build/prelink succeeded after restoring omitted Apple
+headers before archive compilation. Kernel SHA-256:
+`b16455f0281e5e1bac762756a0078419f517e7fd4e4e52ac61519ee635aa2763`.
+Host-packed source-console candidate SHA-256:
+`edff0d4a0fa1d61938458c29da0d5b108ee43de5e853b920d2da590b3ace3562`.
+The FAT kernel matches the prelinked kernel exactly (no binary entry probes).
+This requires execution to reach console creation; hardware console recovery
+and the underlying green-screen stall remain unverified.
+
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
 XNU starts its scheduler, enters IOKit and reaches root mounting. The physical

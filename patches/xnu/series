@@ -1,3 +1,4 @@
 # Board patch paths, one per line in application order.
 arch:../../../patches/xnu/zzzzz-video-console-physical-fb.patch
 arch:../../../patches/xnu/zzzzzz-video-console-text.patch
+early-text-console.patch
