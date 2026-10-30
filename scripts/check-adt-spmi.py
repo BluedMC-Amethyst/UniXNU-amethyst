@@ -10,6 +10,7 @@ args = board['payload']['kernel_args']
 for key, value in [('native-ufs-root', '1'), ('sheng-data-persist', '0'), ('sheng-log', '0')]:
     assert [a for a in args if a.startswith(key + '=')] == [key + '=' + value]
 assert board['payload']['adt']['persistent_data'] is False
+assert board['payload']['panic_screen'] is False, 'Keep kernel87 native entry path; binary panic patch also inserts MMU probes'
 assert 'CONFIG_XNU_NATIVE_UFS=y' in (device / 'configs/amethyst_defconfig').read_text().splitlines()
 
 sys.path.insert(0, str(pathlib.Path(sys.argv[1]).resolve() / 'scripts'))

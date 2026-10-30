@@ -86,7 +86,9 @@ size_mib = 80
 loader = "firmware"
 title = "iPadOS for amethyst"
 dram_size = "0x1FFE00000"
-panic_screen = true
+# Match hardware-working kernel87: retain native text console without binary
+# entry/MMU/panic detours (panic_screen also installs the colour-bar probes).
+panic_screen = false
 kernel_args = [
   "-v",
   "serial=3",

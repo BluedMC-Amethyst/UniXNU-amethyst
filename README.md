@@ -64,6 +64,17 @@ establish controller ownership, DMA/command correctness, root UUID validity,
 root mounting, or userland on Amethyst. Those remain hardware/input milestones,
 not satisfied by build success. No partition writes or hardware boot performed.
 
+Hardware follow-up: both root-enabled and CPU-cluster-fix candidates remained
+at green/blue/magenta bars. The cluster exporter defect was real but did not
+resolve the reported stall. Offline disassembly found kernel87's entry and
+SCTLR instructions unpatched, whereas `panic_screen=true` inserts entry/MMU
+detours even with `--no-reset`. Board payloads now disable that instrumentation
+and retain the native text-console patches. The extracted FAT kernel matches
+the prelinked kernel byte-for-byte. The resulting native-entry candidate is
+SHA-256 `707b4f59ec4a4e12bb56d4dcb57be3ecb931937bb1261c139e27bd27e2c5b2ce`.
+This removes a verified baseline difference; causation and successful hardware
+boot remain unproven. No claim that the stall is definitively fixed.
+
 The port boots from RAM with `fastboot boot`. UEFI mounts the embedded payload,
 UniXNU parses its configuration, DarwinBoot validates the kernel and ADT, and
 XNU starts its scheduler, enters IOKit and reaches root mounting. The physical
