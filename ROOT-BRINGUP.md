@@ -357,6 +357,21 @@ against the unchanged baseline kernel
 its metaclass entries and both lifecycle probes are present with no external
 imports. This is a host-side link result only; nothing has been booted.
 
+### Candidate prepared: `amethyst-owner-union-display`
+
+`staging/amethyst-owner-union-display/Mu-amethyst-owner-union-display.img`,
+73.3 MiB (76,902,400 bytes), sha256
+`ce89993c8db59bf12c317f66308266044fa56a8cb418331e60090832f8bc131a`.
+Repacked from the hardware-proven `amethyst-owner-union` image
+(`73c478d5bf60…`) with the shim rebuilt for the new payload size. One variable
+changed in the kernel (`Payloads/kernel.macho`); the ADT, trust cache and packed
+2 GiB Data seed are byte-identical to the proven baseline.
+
+The only other edit is the boot argument list, which adds
+`offline-mobile-graphics-load=1 offline-legacy-register=1` to reach the
+already-compiled lifecycle hooks. Payload staging is 4 files, `scratch-data.img`
+included. Not yet booted; requires `sudo fastboot boot` and photo capture.
+
 
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
