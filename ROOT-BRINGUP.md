@@ -431,6 +431,34 @@ Interpretation: boots to "Early boot complete" ⇒ the macro is innocent and the
 driver objects are at fault. Stalls identically ⇒ the macro alone is at fault.
 Not yet booted.
 
+### ROOT CAUSE FOUND: the candidates were never prelinked
+
+Bisect A stalled identically, which disproved the flag hypothesis and exposed the
+real fault. Both failed candidates were packaged from the **plain linker output**
+(~91.6 MB, 87.4 MB) instead of a **prelinked** kernel (124,518,400 bytes).
+Segment comparison made it unambiguous: the candidates had
+`__PRELINK_TEXT`, `__PRELINK_INFO`, `__PLK_TEXT_EXEC`, `__PRELINK_DATA` and
+`__PLK_DATA_CONST` **empty (filesize 0)**, i.e. none of the 30 pinned kexts were
+present. A kernel with no driver ecosystem stalls before `PE_create_console()`,
+which is exactly the green-screen stop. The flag, the phase gate and the
+`boot_progress_stage` hook were all irrelevant; those earlier "fixes" changed
+nothing observable.
+
+The recorded build line in `.scratch/ufs-audit/preflight-kernel-build.log` shows
+the missing step: `emit_prelink.py --kernel <linked macho> --prelinked
+<kernelcache> --slide=-0x1000000 --root …×31 --early-security-init …`.
+
+`.scratch/ufs-audit/prelink-candidate.py` now wraps that recipe. It is validated
+by reproducing the hardware-proven baseline **byte-for-byte** (124,518,400 bytes,
+sha256 `b2a7c77b8587c347…`) from `kernel-native.macho` (`22392c97ea1e…`). Pack
+scripts now refuse any kernel under 115 MiB or lacking `__PRELINK_TEXT`, so this
+omission cannot recur silently.
+
+Bisect A repackaged, prelinked: 80,248,832 bytes, sha256
+`841a92d00847a4aabc13be6731881e1982d2a4f57fff647aec3a9929ecbcc069`.
+Verified in-image kernel is 124,518,400 bytes with all 17 segments including
+every prelink segment; boot args still byte-identical to the baseline. Untested.
+
 
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
