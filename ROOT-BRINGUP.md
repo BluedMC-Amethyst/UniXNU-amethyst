@@ -942,3 +942,50 @@ Disassembly of the linked kernel confirms the released-object branch before the
 vtable load. Compile/link exit 0, zero undefined symbols, prelink and pack guards
 pass, all eight checks pass. Watchdog handling, root authorization and UFS write
 bounds unchanged. Hardware untested.
+
+### Nested-panic cascade: this board has no panic region
+
+The display-guard transcript shows `round=1 write/sync=1` (the flush fix is live),
+then `Nested panic detected`, a mutex-unexpectedly-owned abort at lock_mtx.c:175,
+`Nested panic count: 3`, `pe_init.c:707 Assertion failed: panic_info`, count 4,
+count exceeds limit 5, then `Nested panic stall. Stage 2 bailout`.
+
+Root cause of the cascade is a pre-existing kernel/board mismatch, not the
+display work. `check_for_panic_log()` (pexpert/arm/pe_init.c) obtains the panic
+region from either `PLATFORM_PANIC_LOG_PADDR` or the device tree's `pram` node
+plus `/chosen/embedded-panic-log-size`. This build defines
+`PLATFORM_PANIC_LOG_PADDR 0x3c0fc000` in pexpert/pexpert/arm64/BCM2837.h, which
+is a Raspberry Pi 3 DRAM window and meaningless on this SoC, and the Amethyst
+device tree has neither `pram` nor `embedded-panic-log-size` (checked with dtc
+against .scratch/ufs-audit/owner-baseline.dtb). So `gPanicBase` and `panic_info`
+stay 0 for the whole boot.
+
+`PE_update_panicheader_nestedpanic()` asserted on that NULL, which is only
+reachable when a second panic occurs. The first fault is therefore converted into
+assert -> panic -> nested -> mutex abort -> reset, and the original panic text is
+destroyed before anything can persist it. This is why two runs in a row lost the
+real fault even though the logger was writing.
+
+Fix: that function now returns without the assertion when `panic_info` is NULL.
+Nesting is still reported by the caller (`check_and_handle_nested_panic` prints
+the nested panic string and count), so only the header maintenance that has no
+storage to update is skipped. Nothing suppresses the original panic.
+
+Building it required `pe_init.c` to be compiled standalone: the bsd owner recipe
+lacks `<pexpert/pe_images.h>` (generated, not exported), so the command appends
+`-I xnu-work/pexpert` and `-DPEXPERT_KERNEL_PRIVATE=1`. Compile and link exit 0
+with zero undefined symbols; the linked kernel branches (`cbz x8`) at
+`PE_update_panicheader_nestedpanic+0x14` instead of asserting.
+
+Candidate `staging/amethyst-nested-panic/Mu-amethyst-nested-panic.img`,
+80,310,272 bytes, SHA256
+`38b14508870f7a03b2d6e6118f4805cfad2a890c38627125738c30da32fa4fea`;
+kernel SHA256 `8d36c01e4ec1617764ff3a5897093ba022a625db9f141daf503b0eeb323c1e93`.
+`check-nested-panic-fix.py` pins the board premise and the fix. All nine checks
+pass. Watchdog handling, root authorization and UFS bounds unchanged. Hardware
+untested.
+
+The original fault is still unidentified. Its `panic_caller` values
+(0xfffffff000bf4434, 0xfffffff000bf1168) do not resolve to any instruction in the
+tested kernel after correcting for transcription digit doubling, so they were not
+used to name a function.
