@@ -537,8 +537,9 @@ keyevents, mic, and the board-page renderer buffers). Rather than hand-writing
 them, `gen-standins.py` parses `BootLog.c`'s own `weak_import` declarations and
 emits a definition of the identical type -- weak, so a real driver always wins,
 and reading as zero/empty so the log prints those rows blank. Functions get weak
-no-ops returning 0/NULL so `if (&fn)` stays false, which is what "not available"
-means to the writer.
+no-ops returning zero rows. Correction: a defined weak function has a nonzero
+address, so `if (&fn)` passes. String-returning stand-ins must satisfy the
+caller's contract; see the tag fix below.
 
 `bsd_init.c` now calls `amethyst_boot_log_start()` after `bsd_autoconf()`, which
 starts a small thread that ticks `boot_log_tick()` once a second. sheng's own
@@ -566,3 +567,26 @@ decodes with sheng's `read-sheng-log.py`. A window whose header magic is absent
 means the writer never started, which is reported distinctly from a decode error.
 Nothing is written to the phone.
 
+### 2026-11-01: empty log and tag stand-in correction
+
+The user booted the log candidate successfully through fastboot and reported
+the same screen behavior as the baseline. Recovery extraction returned 32 MiB,
+but the decoder reported eight zero magic bytes. This does not establish that
+BSD initialization was never reached: the baseline reaches userspace service
+failures and a watchdogd-related panic.
+
+Static audit found `boot_progress_tag()` returning NULL in the generated
+stand-ins. The writer calls `strlcpy(h.tag, boot_progress_tag(), ...)` before
+writing its first header. Its function-address guard passes because the stub
+is defined. The corrected stand-in returns an empty string. Disassembly
+confirms the original returned zero and the replacement returns a string
+address. This is a concrete defect, not yet a hardware-confirmed explanation.
+
+Corrected candidate (old image preserved):
+`staging/amethyst-log-tagfix/Mu-amethyst-log-tagfix.img`, 80,285,696 bytes,
+SHA256 `d4efafc765738110c561b71625a482e1933107c04918029fd58f40afdcc7b748`.
+Kernel SHA256 `4b0c6f9cc6de4947bd53e58258e0bc358d67709d2639d9e5fb27ee2d715f3546`;
+124,764,160 bytes, 17 segments, required prelink segments populated, zero
+undefined symbols in the linked kernel. `check-standins.py` passes.
+BSD hook, storage driver, and boot arguments are unchanged from the log test.
+Hardware test pending; no boot or partition operation performed by the agent.

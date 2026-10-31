@@ -64,6 +64,8 @@ whether the writer started.
 * `gen-standins.py` does not hand-copy declarations. It parses `BootLog.c`'s own
   `weak_import` declarations and emits a definition of the identical type, all
   weak so a real driver always wins, reading as zero/empty. Functions become weak
-  no-ops returning 0/NULL so the writer's `if (&fn)` tests stay false, which is
-  what "not available" means to it. asteroids' `BootLogStandins.c` covers the
+  no-ops returning zero rows. Defined weak functions have nonzero addresses;
+  address guards therefore pass. `boot_progress_tag()` must return an empty
+  string, not NULL, because the writer passes it to `strlcpy()` before writing
+  its first header. asteroids' `BootLogStandins.c` covers the
   board it was generated for but leaves 94 symbols undefined here.

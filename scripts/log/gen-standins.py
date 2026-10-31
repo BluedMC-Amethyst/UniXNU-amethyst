@@ -128,12 +128,9 @@ def parse_declarations(text):
 
 
 def emit_function(name, type_text, params):
-    """A weak no-op that reports "not available": 0 rows, or NULL for a string.
-
-    BootLog.c guards each of these with `if (&fn)`, so a definition is needed to
-    link, but returning zero means it formats an empty row, exactly as if the
-    probe had never run.
-    """
+    """Return zero rows, but preserve the tag caller's non-NULL contract."""
+    if name == 'boot_progress_tag':
+        return f'WEAK {type_text} {name}{params} {{ return ""; }}'
     if type_text == 'const char *' or type_text.endswith('*'):
         return f'WEAK {type_text} {name}{params} {{ return 0; }}'
     if type_text == 'void':

@@ -14,6 +14,7 @@ baseline: Payloads/kernel.macho is the prelinked kernel built with BootLog.c,
 plus the single boot argument sheng-log=1. Every other file and every other boot
 argument is byte-identical to the baseline.
 """
+import argparse
 import gzip
 import hashlib
 from pathlib import Path
@@ -23,14 +24,19 @@ import sys
 import tempfile
 import zlib
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 KIT = Path(__file__).resolve().parent
 # Scratch space for staged images; never /tmp, so intermediate files survive a reboot.
 AUDIT = ROOT / '.scratch/ufs-audit'
 SOURCE = ROOT / 'staging/amethyst-owner-union/Mu-amethyst-owner-union.img'
 KERNEL = KIT / 'kernel-log-prelinked.macho'
 OUT = ROOT / 'staging/amethyst-log'
-DEST = OUT / 'Mu-amethyst-log.img'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--kernel', type=Path, default=KERNEL)
+parser.add_argument('--out', type=Path, default=OUT)
+args = parser.parse_args()
+KERNEL, OUT = args.kernel, args.out
+DEST = OUT / ('Mu-' + OUT.name + '.img')
 BASE_SHA256 = '73c478d5bf60130761db524fbb37a8ce7bcb4bb6a64241a3f9ea2da3a50075e4'
 
 # A bootable kernel MUST carry the prelinked kext segments. Without this guard a
