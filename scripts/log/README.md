@@ -69,3 +69,23 @@ whether the writer started.
   string, not NULL, because the writer passes it to `strlcpy()` before writing
   its first header. asteroids' `BootLogStandins.c` covers the
   board it was generated for but leaves 94 symbols undefined here.
+
+## Building the display-flush candidate
+
+`build-log.py` compiles the logger only. Producing the kernel requires the
+patched BSD source and the workspace link inputs:
+
+1. Apply the display gate to the build tree's `bsd/kern/bsd_init.c`:
+   remove the post-`vfsinit` `native_mobile_graphics_load_probe()` call and the
+   late probe inside `bsd_autoconf`, then after `amethyst_boot_log_start()`
+   wait (bounded) on `amethyst_boot_log_durable`, flushing before/after
+   `native_mobile_graphics_load_probe()` and
+   `native_legacy_display_late_probe()`.
+2. Compile that file with the owner command, replacing
+   `XNU_NATIVE_LEGACY_DISPLAY=0` with `=1`.
+3. Link with the saved filelist plus the display objects, then run the
+   mandatory `prelink-candidate.py`, then `pack-log.py --display-probe`.
+
+The exact commands used are recorded as JSON in
+`.scratch/ufs-audit/logkit/display-flush-link-command.json`; the BSD source is
+the build tree file at commit time, not a copy inside this repository.
