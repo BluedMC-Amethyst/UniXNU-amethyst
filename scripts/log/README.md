@@ -40,7 +40,7 @@ python3 scripts/log/pack-log.py        # RAM image with sheng-log=1
 Once booted, read it back in LineageOS Recovery:
 
 ```
-python3 scripts/log/pull-log.py --out /path/to/result
+python3 scripts/log/pull-log.py --out /path/to/result --serial <adb-serial>
 ```
 
 `pull-log.py` resolves `unixnu`'s start and size from the recovery shell, copies

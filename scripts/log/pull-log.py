@@ -15,7 +15,7 @@ Nothing is written to the phone: the 32 MiB copy goes to /tmp (RAM) and comes
 back with `adb pull`.
 """
 import argparse
-import re
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -29,7 +29,32 @@ PARTITION = 'unixnu'
 
 
 def adb(*args, check=True):
-    return subprocess.run(['adb', *args], check=check, capture_output=True).stdout
+    """Run adb and return its stdout.
+
+    A failing adb call is reported as the tool's own message rather than a
+    CalledProcessError traceback: the usual causes (no device selected, several
+    devices attached, recovery not booted) are recoverable by the operator, and
+    the traceback hid which one it was.
+    """
+    result = subprocess.run(['adb', *args], capture_output=True)
+    if result.returncode and check:
+        detail = (result.stderr or result.stdout).decode(errors='replace').strip()
+        message = f'adb {" ".join(args)} failed (exit {result.returncode})'
+        if 'more than one device' in detail or 'no devices' in detail:
+            message += ': select the phone with ANDROID_SERIAL=<serial>'
+        raise SystemExit(f'{message}\n{detail}' if detail else message)
+    return result.stdout
+
+
+def use_serial(serial):
+    """Pin adb to one device.
+
+    adb selects a device from -s, else ANDROID_SERIAL, else the only attached
+    one. This host often has more than one, so pinning explicitly avoids
+    `adb shell` failing with "more than one device/emulator".
+    """
+    if serial:
+        os.environ['ANDROID_SERIAL'] = serial
 
 
 def partition_bounds(name):
@@ -67,6 +92,9 @@ def main():
     ap.add_argument('--out', required=True, type=Path,
                     help='directory for log.bin and the decoded text')
     ap.add_argument('--partition', default=PARTITION)
+    ap.add_argument('--serial', default=None,
+                    help='adb serial to read from (else ANDROID_SERIAL, else the '
+                         'only attached device)')
     ap.add_argument('--device', default=None,
                     help='block device to read instead of looking up the partition')
     ap.add_argument('--expect-first', type=int, default=90660608,
@@ -74,6 +102,7 @@ def main():
                          'reading the wrong region (default: unixnu first LBA per '
                          'the partition plan). Pass 0 to disable.')
     args = ap.parse_args()
+    use_serial(args.serial)
     args.out.mkdir(parents=True, exist_ok=True)
 
     if adb('shell', 'id -u').decode().strip() != '0':
