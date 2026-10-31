@@ -236,6 +236,24 @@ Watchdog handling is unchanged, so this is not a claim to fix both failures.
 SHA-256: `73c478d5bf60130761db524fbb37a8ce7bcb4bb6a64241a3f9ea2da3a50075e4`.
 Compile/link/prelink and payload comparisons pass; hardware untested.
 
+### Native union hardware result
+
+Photo `_X8A0103.JPG` beside owner-union shows no repeated missing-libobjc
+abort strings in the captured screen. bluetoothd exits with rv=0, signal=0,
+namespace=0, code=0. This is progress past the earlier shared library failure,
+not proof of a fully functional Bluetooth stack.
+
+SpringBoard repeatedly traps at PC=LR=0x1a37db2ec, ESR=0xf2000000;
+its exit is signal 5, namespace 2, code 5, rather than the prior SIGABRT.
+watchdogd pid 52 traps at PC=LR=0x1001dab0c, ESR=0xf2000001;
+another watchdogd instance traps at 0x100affb0c with the same ESR.
+The final panic still names watchdogd. The first watchdog PC's low offset
+matches the known original BRK site only after a possible ASLR adjustment;
+exact loaded-image base evidence is still needed before claiming a match.
+
+Next symbolicate SpringBoard's shared-cache trap and qualify watchdog image
+base/branch. Do not patch either BRK instruction or suppress exception handling.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
