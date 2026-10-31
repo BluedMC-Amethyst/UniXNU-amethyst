@@ -287,6 +287,15 @@ system display. Do not claim a boot-argument-only fix or import an unqualified
 vtable ABI. Next reconstruct/qualify the exact original Legacy ABI and provider
 publication path, or obtain the matching missing generator/build artifacts.
 
+Static requalification against the actual kernel-union candidate passes: exact
+original IOMobileGraphicsFamily executable SHA-256
+`2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b`,
+constructor-derived Legacy vptr, 358 nonnull method slots, and nine pure-virtual
+slots 211/213/245/246/306/307/337/338/345. This establishes layout facts only.
+Method signatures, object allocation/lifecycle and provider publication remain
+unqualified. The header/generator search found no matching artifacts in local
+trees or queried upstream paths; no runnable display candidate was produced.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
