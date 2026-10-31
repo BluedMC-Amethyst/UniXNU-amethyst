@@ -94,6 +94,20 @@ authenticated root writable. Next inspect the existing RAM-backed Data seed and
 owner Data mount path; persistent allocation requires a separately reviewed
 write plan. No further root-image flash or repartitioning is indicated.
 
+### Data-seed prerequisite checked
+
+The existing `prepare-owner-data-fixture.py` creates APFS with macOS hdiutil,
+copies the exact OS private/var tree while preserving symlinks and modes, and
+records the new volume UUID. The owner Data mount path binds that UUID to a
+RAM-backed provider, mounts it at /private/var and checks that the resulting
+mount is writable APFS on the expected device.
+
+No compatible Data seed was found in SmallProject or the local amethyst-work,
+amethyst-known-good and amethyst-kernel-building trees. This Linux environment
+has no hdiutil or mkfs.apfs. A supplied populated APFS Data seed, or access to
+a macOS host to generate it, is the current prerequisite. Do not enable the
+Data mount switch without that input or substitute Android userdata.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
