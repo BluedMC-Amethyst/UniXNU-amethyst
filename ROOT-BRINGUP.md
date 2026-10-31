@@ -945,6 +945,13 @@ bounds unchanged. Hardware untested.
 
 ### The green-bar freeze was my object build, not the panic fix
 
+**Confirmed on hardware.** `amethyst-display-guard` was booted again as a control
+and reached XNU, printing a panic. The device and environment are sound. That
+image contains `assert(panic_info)` at pe_init.c:707 unchanged, so the assert
+removal is not what froze the candidate. The candidate's kernel differs from the
+control's (sha256 `8d36c01e…` against `ea2fc648…`), and the only source of that
+difference was the hand-built object described below.
+
 The candidate carrying the nested-panic fix froze at the green iBoot bar before
 XNU printed anything, and no log could be pulled. The fix itself was never at
 fault. The object was rebuilt by hand with the wrong flags.
@@ -1102,3 +1109,31 @@ Persistence now lives only in `amethyst_boot_log_flush`, which runs on the write
 thread, uses `IOLockTryLock`, and is already proven (`round=1 write/sync=1`).
 `check-panic-hook-lock.py` fails if the hook ever regains a device call or a
 blocking lock.
+
+### Hook-fix image
+
+`amethyst-display-guard` was re-booted as a control and reached XNU, printing a
+panic. That image contains the unsafe hook: `boot_log_panic_record` calls both
+`native_ufs_log_write` (via `hostWrite4k`) and `native_ufs_log_sync`, and both
+take `lck_mtx_lock` and issue `hostScsiDir`. So the panic on disk after that boot
+is the mutex-abort cascade, not the original fault. Fixing the hook is a
+prerequisite for reading the real one.
+
+| Field | Value |
+| --- | --- |
+| Image | `staging/amethyst-hookfix/Mu-amethyst-hookfix.img` |
+| Size | 80,310,272 bytes |
+| SHA256 | `ad32f65735c2a7bac2fed6e5f7b2be5492bc35f3d8cbc84738315342b71560eb` |
+| Prelinked kernel SHA256 | `15ef6f5dc7592d81e22dd60102771665a07714f48b6b43d55c5322ee6c240a2c` |
+
+Built from the unchanged `guard` filelist with `BootLog.o` rebuilt from the
+patched source, so `pe_init.o` is the shipped object and the only difference
+from the proven image is the panic hook. Zero undefined symbols. All five
+prelink segments are byte-identical in size to `amethyst-display-guard`
+(`__PRELINK_TEXT` 6,963,200, `__PRELINK_INFO` 483,328, `__PLK_TEXT_EXEC`
+20,447,232, `__PRELINK_DATA` 1,392,640, `__PLK_DATA_CONST` 3,555,328). Boot
+arguments unchanged, exactly one `sheng-log=1`. Hardware untested.
+
+The linked kernel was checked for the property that matters: no `bl` to
+`native_ufs_log_write` or `native_ufs_log_sync` anywhere inside
+`boot_log_panic_record`. All eleven checks pass.
