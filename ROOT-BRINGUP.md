@@ -274,6 +274,19 @@ display service/provider chain. A framebuffer text console alone does not
 establish that CADisplay discovery or UI rendering works. Watchdog remains a
 separate service issue; no breakpoint instructions were modified.
 
+### Display integration inspection
+
+Amethyst defconfig disables both XNU_NATIVE_LEGACY_DISPLAY and
+XNU_NATIVE_MOBILE_DISPLAY. The selected local legacy source requires
+OriginalLegacyFramebufferABI.h, which is absent. The catalog-pinned
+GopFramebuffer cf3b42979a9c44219e7bb149543e6fc3388b58ed tree also lacks that
+header. Existing host checks reference generated headers/build reports and
+offline traces that are not available as a ready-to-link local display archive.
+The local source explicitly describes its legacy class as not yet a published
+system display. Do not claim a boot-argument-only fix or import an unqualified
+vtable ABI. Next reconstruct/qualify the exact original Legacy ABI and provider
+publication path, or obtain the matching missing generator/build artifacts.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
