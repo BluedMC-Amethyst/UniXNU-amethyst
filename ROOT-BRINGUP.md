@@ -121,6 +121,21 @@ This is close to the loader's 256 MiB packed-input ceiling; do not silently
 truncate it or load the entire logical disk as a dense boot input.
 RAM-backed Data integration remains pending; the seed is not hardware-tested.
 
+### RAM Data candidate assembled (host only)
+
+`Mu-amethyst-owner-data.img` enables the existing RAM Data mount with the exact
+Actions seed UUID. It supplies the losslessly packed seed as scratch-data.img,
+adds only the PackedRAMDisk ADT reservation and initrd configuration, and keeps
+root/cache verification and original trust caches. Raw persistence stays off.
+Payload FAT32 grows to 400 MiB; the reproduced BootShim is rebuilt with matching
+x2 size handoff and ARM64 total length. Firmware body and hardware DTB are kept.
+
+SHA-256: `b4bb44db38f0c56a91cab45bb2202e9ea760509c4560af7f75d2f2b79229578c`.
+Boot image size is 303636480 bytes; bootloader download capacity is unverified.
+Compilation, isolated link/prelink, exact FAT file round-trips and size-handoff
+checks pass. No phone storage writes were made. Data mount and memory capacity
+remain hardware-untested; RAM Data changes are lost on reboot.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
