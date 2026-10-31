@@ -34,6 +34,8 @@ OUT = ROOT / 'staging/amethyst-log'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--kernel', type=Path, default=KERNEL)
 parser.add_argument('--out', type=Path, default=OUT)
+parser.add_argument('--display-probe', action='store_true',
+                    help='enable the separately linked legacy display publication probe')
 args = parser.parse_args()
 KERNEL, OUT = args.kernel, args.out
 DEST = OUT / ('Mu-' + OUT.name + '.img')
@@ -74,9 +76,17 @@ with tempfile.TemporaryDirectory(dir=AUDIT, prefix='log-pack-') as tempdir:
     assert b'sheng-log=1' not in config, 'baseline already enables the log'
     # Add the one flag. The driver reads it with PE_parse_boot_argn; the log
     # window then appears in unixnu's tail (NativeUfs kLogReserveBlocks).
-    config = config.replace(b'offline-apfs-load=1',
-                            b'offline-apfs-load=1 sheng-log=1')
+    assert config.count(b'sheng-log=0') == 1, 'expected one baseline log setting'
+    config = config.replace(b'sheng-log=0', b'sheng-log=1')
+    assert config.count(b'sheng-log=') == 1, 'duplicate log settings'
     assert config.count(b'sheng-log=1') == 1
+    if args.display_probe:
+        assert config.count(b'offline-apfs-load=1') == 1
+        for flag in (b'offline-mobile-graphics-load', b'offline-legacy-register', b'offline-legacy-phase'):
+            assert flag + b'=' not in config, 'display flag already set'
+        config = config.replace(b'offline-apfs-load=1',
+                                b'offline-apfs-load=1 offline-mobile-graphics-load=1 '
+                                b'offline-legacy-register=1 offline-legacy-phase=4')
 
     adt = get(old, '::/EFI/UniXNU/Payloads/kernel.macho.adt')
     trust = get(old, '::/EFI/UniXNU/Payloads/kernel.macho.trustcache')
@@ -133,10 +143,11 @@ with tempfile.TemporaryDirectory(dir=AUDIT, prefix='log-pack-') as tempdir:
         f'source_sha256={hashlib.sha256(b).hexdigest()}\n'
         f'kernel={KERNEL.name}\n'
         f'kernel_sha256={hashlib.sha256(KERNEL.read_bytes()).hexdigest()}\n'
-        f'boot_args_added=sheng-log=1\n'
-        f'changed=Payloads/kernel.macho (BootLog.c writer) + sheng-log=1\n'
+        f'boot_args_log=sheng-log=1\n'
+        f'display_probe={args.display_probe}\n'
+        f'changed=Payloads/kernel.macho + unixnu.toml logging/display settings\n'
         f'log_window=unixnu partition tail ({8192 * 4096} bytes)\n')
-    print('PASS: only Payloads/kernel.macho and sheng-log=1 differ from the baseline')
+    print('PASS: kernel and requested logging/display settings packed; retained payloads verified')
     print('PASS: shim size handoff and ARM64 header match actual payload')
     print('Boot bytes:', len(result))
     print(digest, DEST)

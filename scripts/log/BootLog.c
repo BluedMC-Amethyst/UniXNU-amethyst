@@ -262,9 +262,11 @@ struct boot_log_header {
 };
 // Writer state for the board page: 0 off, 1 waiting for the window, 2 writing, 3 stopped after errors, 4 stopped (GPT changed).
 volatile uint32_t boot_log_state, boot_log_rounds, boot_log_errors;
+volatile uint32_t amethyst_boot_log_durable;
 volatile uint64_t boot_log_first_lba;
 static int boot_log_started;
 static uint8_t *boot_log_buffer;   // LogMsgBlocks blocks: the message buffer, then reused for a slot and the header
+static uint64_t startup_first, startup_blocks, startup_boot_id;
 
 // The export: boot_log_export_put takes the blob's pieces in order (any thread) and writes them through a staging buffer straight into
 // the half of the export region that does not hold the last complete blob; once the last piece is on the medium that blob becomes the
@@ -1595,18 +1597,54 @@ static uint32_t copy_msgbuf(uint8_t *out) {
   return n;
 }
 
+// Synchronous message-buffer flush for code that may not survive to the next
+// writer round (the display experiment panics inside its first round). Writes
+// the same message region and header the writer owns, then syncs. Bounded to
+// the caller's context and serialized against the writer with a try-lock, so a
+// busy writer simply skips this flush instead of blocking a boot thread.
+volatile uint32_t amethyst_boot_log_flushes;
+int amethyst_boot_log_flush(const char *why) {
+  if (boot_log_state == 0 || !boot_log_buffer || !startup_blocks) return -1;
+  if (!IOLockTryLock(export_lock)) return -2;
+  struct boot_log_header h;
+  memset(&h, 0, sizeof h);
+  memcpy(h.magic, "SHLOG001", 8);
+  h.version = 4;
+  h.header_bytes = sizeof h;
+  h.boot_id = startup_boot_id;
+  h.first_lba = startup_first;
+  h.window_blocks = (uint32_t)startup_blocks;
+  h.msg_first = LogMsgFirst; h.msg_blocks = LogMsgBlocks;
+  h.slot_first = LogSlotFirst; h.slot_blocks = LogSlotBlocks;
+  h.slot_count = (uint32_t)((startup_blocks - LogSlotFirst) / LogSlotBlocks);
+  h.state = 5;                     // checkpoint flush, not a writer round
+  h.msg_bytes = copy_msgbuf(boot_log_buffer);
+  h.slots_written = boot_log_rounds;
+  h.uptime_s = 0;
+  int ok = native_ufs_log_write(LogMsgFirst, LogMsgBlocks, boot_log_buffer);
+  ok &= native_ufs_log_write(0, 1, (const uint8_t *)&h);
+  ok &= native_ufs_log_sync();
+  ++amethyst_boot_log_flushes;
+  IOLog("AmethystBootLog: flush=%s ok=%d msg=%u\n", why ? why : "?", ok, h.msg_bytes);
+  IOLockUnlock(export_lock);
+  return ok ? 0 : -3;
+}
+
 static void writer(void *arg, wait_result_t result) {
   (void)arg; (void)result;
   thread_set_thread_name(current_thread(), "boot_log");
-  uint64_t first = 0, blocks = 0;
+  uint64_t first = startup_first, blocks = startup_blocks;
   const char *why = "";
   boot_log_state = 1;
+  IOLog("AmethystBootLog: writer entered\n");
   // The window exists once NativeUfs has read the root layout; until then the open is refused ("no root layout").
-  while (!native_ufs_log_open(&first, &blocks, &why)) {
+  while (!blocks && !native_ufs_log_open(&first, &blocks, &why)) {
+    IOLog("AmethystBootLog: window refused: %s\n", why ? why : "(no reason)");
     if (strcmp(why, "no root layout")) {boot_log_state = 3; return;}
     IOSleep(1000);
   }
   boot_log_first_lba = first;
+  IOLog("AmethystBootLog: window first=%llu blocks=%llu\n", first, blocks);
   const uint32_t slot_count = (uint32_t)((blocks - LogSlotFirst) / LogSlotBlocks);
   if (&native_ufs_export_blocks && &native_ufs_export_write) {
     IOLockLock(export_lock);
@@ -1677,6 +1715,8 @@ static void writer(void *arg, wait_result_t result) {
     memcpy(boot_log_buffer, &h, sizeof h);
     ok &= native_ufs_log_write(0, 1, boot_log_buffer);
     ok &= native_ufs_log_sync();
+    if (ok) __atomic_store_n(&amethyst_boot_log_durable, 1, __ATOMIC_RELEASE);
+    if (h.rounds == 1 || !ok) IOLog("AmethystBootLog: round=%u write/sync=%d\n", h.rounds, ok);
     if (!ok) {boot_log_errors = ++errors;} else errors = 0;
     if (errors >= LogMaxErrors) {boot_log_state = 3; return;}
     if (h.gpt_last != h.gpt_open) {boot_log_state = 4; return;}
@@ -1710,11 +1750,50 @@ void boot_log_tick(unsigned now) {
     if (&boot_reset_watchdog) boot_reset_watchdog(autoreset + 60, boot_log_reset_watchdog, sizeof boot_log_reset_watchdog);
   }
   uint32_t mode = 0;
-  if (!PE_parse_boot_argn("sheng-log", &mode, sizeof mode) || mode != 1) return;
+  int found = PE_parse_boot_argn("sheng-log", &mode, sizeof mode);
+  IOLog("AmethystBootLog: tick sheng-log found=%d mode=%u\n", found, mode);
+  if (!found || mode != 1) return;
   if (!&native_ufs_log_open || !&native_ufs_log_write || !&native_ufs_log_sync) return;
   boot_log_buffer = (uint8_t *)IOMallocAligned(LogMsgBlocks * LogBlock, LogBlock);
-  if (!boot_log_buffer) return;
+  if (!boot_log_buffer) { IOLog("AmethystBootLog: buffer allocation failed\n"); return; }
   export_lock = IOLockAlloc();
+  if (!export_lock) { IOLog("AmethystBootLog: lock allocation failed\n"); return; }
+  // ponytail: capture one message-buffer snapshot before async diagnostics;
+  // periodic snapshots still belong to writer(). No optional probe is called.
+  const char *why = "";
+  if (native_ufs_log_open(&startup_first, &startup_blocks, &why)) {
+    struct boot_log_header h;
+    memset(&h, 0, sizeof h);
+    memcpy(h.magic, "SHLOG001", 8);
+    h.version = 4;
+    h.header_bytes = sizeof h;
+    h.boot_id = log_ticks();
+    startup_boot_id = h.boot_id;
+    h.first_lba = startup_first;
+    h.window_blocks = (uint32_t)startup_blocks;
+    h.msg_first = LogMsgFirst;
+    h.msg_blocks = LogMsgBlocks;
+    h.slot_first = LogSlotFirst;
+    h.slot_blocks = LogSlotBlocks;
+    h.slot_count = (uint32_t)((startup_blocks - LogSlotFirst) / LogSlotBlocks);
+    h.state = 1;
+    strlcpy(h.tag, "bsd-startup", sizeof h.tag);
+    h.msg_bytes = copy_msgbuf(boot_log_buffer);
+    if (!native_ufs_log_write(LogMsgFirst, LogMsgBlocks, boot_log_buffer)) {
+      h.msg_bytes = 0;
+      h.write_errors = 1;
+    }
+    memset(boot_log_buffer, 0, LogBlock);
+    memcpy(boot_log_buffer, &h, sizeof h);
+    int written = native_ufs_log_write(0, 1, boot_log_buffer);
+    int synced = native_ufs_log_sync();
+    if (written && synced) __atomic_store_n(&amethyst_boot_log_durable, 1, __ATOMIC_RELEASE);
+    IOLog("AmethystBootLog: startup header write=%d sync=%d\n", written, synced);
+  } else {
+    IOLog("AmethystBootLog: startup window refused: %s\n", why ? why : "unknown");
+  }
   thread_t thread;
-  if (kernel_thread_start_priority(writer, 0, BASEPRI_KERNEL, &thread) == KERN_SUCCESS) thread_deallocate(thread);
+  kern_return_t status = kernel_thread_start_priority(writer, 0, BASEPRI_KERNEL, &thread);
+  IOLog("AmethystBootLog: writer thread status=%d\n", status);
+  if (status == KERN_SUCCESS) thread_deallocate(thread);
 }

@@ -124,25 +124,21 @@ def main():
             sys.exit(f'{args.partition} has {blocks} blocks, smaller than the '
                      f'{LOG_BLOCKS}-block log window')
         # The window is the last LOG_BLOCKS blocks of the partition.
-        skip = start + blocks - LOG_BLOCKS
+        skip = blocks - LOG_BLOCKS
         region = device
         print(f'{args.partition}: {device} start={start} blocks={blocks} '
               f'({blocks * BLOCK / 2**30:.1f} GiB)')
-        print(f'log window: LBA {skip}..{start + blocks - 1} '
+        print(f'log window: LBA {start + skip}..{start + blocks - 1} '
               f'({LOG_BLOCKS * BLOCK // 2**20} MiB)')
 
     remote = '/tmp/amethyst-log.bin'
-    # toybox's dd cannot seek on a block device: `dd skip=<huge>` prints
-    # "/dev/block/sdaNN: Can't skip", runs for minutes and copies nothing. The
-    # window is the *last* LOG_BLOCKS blocks of the partition, so it is taken
-    # with `tail -c`, which needs no seek. Errors are left visible on purpose: a
-    # failed copy must say why, not read back as "0 bytes".
+    # Offsets on a partition node are relative to that partition, not the disk.
+    # Do not use tail: block devices may report a zero file length to it.
     if skip is not None:
-        command = (f'tail -c {LOG_BLOCKS * BLOCK} /dev/block/by-name/{args.partition} '
-                   f'> {remote}')
+        command = f'dd if={region} of={remote} bs={BLOCK} skip={skip} count={LOG_BLOCKS}'
     else:
         command = f'dd if={region} of={remote} bs={BLOCK} count={LOG_BLOCKS}'
-    adb('shell', command, check=False)
+    adb('shell', command)
     copied = adb('shell', f'stat -c %s {remote} 2>/dev/null', check=False).decode().strip()
     if copied != str(LOG_BLOCKS * BLOCK):
         sys.exit(f'the copy in {remote} has {copied or "no"} bytes, '
@@ -153,8 +149,10 @@ def main():
     if log.stat().st_size != LOG_BLOCKS * BLOCK:
         sys.exit(f'short read: {log.stat().st_size} of {LOG_BLOCKS * BLOCK} bytes')
 
-    subprocess.run([sys.executable, str(DECODER), '--decode', str(log),
-                    '--out', str(args.out)], check=True)
+    result = subprocess.run([sys.executable, str(DECODER), '--decode', str(log),
+                             '--out', str(args.out)])
+    if result.returncode:
+        sys.exit(result.returncode)
     latest = args.out / 'latest.txt'
     if latest.exists():
         print(f'\n--- {latest} (last lines) ---')

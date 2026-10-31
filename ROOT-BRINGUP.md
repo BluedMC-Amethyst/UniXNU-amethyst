@@ -590,3 +590,223 @@ Kernel SHA256 `4b0c6f9cc6de4947bd53e58258e0bc358d67709d2639d9e5fb27ee2d715f3546`
 undefined symbols in the linked kernel. `check-standins.py` passes.
 BSD hook, storage driver, and boot arguments are unchanged from the log test.
 Hardware test pending; no boot or partition operation performed by the agent.
+
+### 2026-11-01: tagfix still empty; actual linked UFS object corrected
+
+The user decoded the tagfix extraction: magic was still eight zero bytes.
+Audit of `tagfix-link-command.json` found `NativeUfs-owner.o` was linked, not
+`NativeUfs-logunix.o`. The earlier replacement targeted the wrong object name;
+both log candidates therefore retained the original split-device log refusal.
+Replacing the object naively exposed missing `_native_verified_block_manifest_sha384`
+and `_boot_progress_poll`; no stubs were added for these. Instead, the saved
+owner-enabled source was retained, with only the log geometry/open implementation
+updated. Root-authorization behavior and the baseline no-poll path are preserved.
+
+New candidate: `staging/amethyst-log-unixnu/Mu-amethyst-log-unixnu.img`,
+80,285,696 bytes, SHA256
+`c1cfb428bc062415f33f49a5ceb77109a57336b8cc759e384574ef89dcc4302c`.
+Prelinked kernel SHA256
+`ef3b826563dffa0adf36cbbe29337227643146812303ee214813fb9cc9bde691`.
+Compile and link exited 0, linked kernel has zero undefined symbols, pack
+checks passed. Scratch source and exact link command are in
+`.scratch/ufs-audit/logkit/NativeUfs-owner-logunix.cpp` and
+`unixnu-link-command.json`. Untested on hardware; old candidates preserved.
+Saved-file decoder now imports Unix serial modules only in the serial path;
+an import-blocking check confirms decoding can reach header validation without
+`termios` or `tty`. Actual Windows validation remains with the user.
+
+### Headerless trace run; direct startup candidate
+
+The user observed the BSD-hook marker and monitor thread status 0 on the trace
+candidate, but no later marker was noticed. Partition-relative recovery read
+also decoded as eight zero magic bytes. Thread creation is confirmed, execution
+of the monitor is not. XNU's kernel_thread_start_priority already calls
+thread_start; there is no missing resume operation.
+
+BootLog's tick is one-shot initialization which starts its own writer. Removed
+the redundant monitor thread, naming and time conversion: the confirmed BSD
+hook now calls boot_log_tick(0) directly. Writer/storage code unchanged from
+the trace run. This is a targeted simplification, not a proven root cause.
+
+`staging/amethyst-log-direct/Mu-amethyst-log-direct.img`, 80,285,696 bytes,
+SHA256 `de63e64c53cf6db372f591f0dfaca386eff766c2f89190b38e5937460c80eca5`.
+Kernel SHA256 `7775bf8194cd1d34dbef187bb128b73e7fec1f4e9b2a2c08128f5c0f3616963d`.
+Compile/link exit 0, no undefined symbols, prelink/pack guards pass. No monitor
+symbol remains in linked output. Hardware test pending.
+
+Reader correction: dd on sda34 requires partition-relative skip 33546240, not
+disk LBA 124206848. Earlier claims of a toybox seek limitation were incorrect.
+The user tested the corrected read; it too was headerless. Decoder failures now
+exit without a redundant Python traceback. Windows saved-file decoding reaches
+the header check after moving Unix-only imports into serial initialization.
+
+### Synchronous first snapshot, after direct-start also yielded no header
+
+Direct-start extraction was headerless. No runtime failure point is established.
+The first durable record previously depended on writer scheduling and completion
+of the optional-probe formatter. BootLog now opens the same bounded log window
+in the confirmed BSD hook and saves a message-buffer snapshot plus a version-4
+header tagged `bsd-startup`, before starting the writer thread. The writer reuses
+the already-open window rather than opening it again. Failed message writes
+produce a header with zero message bytes and a write error; no slots are claimed.
+Storage bounds, root authorization, and boot arguments are unchanged.
+
+Candidate: `staging/amethyst-log-snapshot/Mu-amethyst-log-snapshot.img`.
+SHA256 `256e30f4f63bdb91483954af5cfb9bcc81eb700789f75ce4f9d5b9e18fbc37d7`.
+Kernel SHA256 `c85c9054e00ea3b936fc44b2ef651f91ab6390125770980e07c9a9fd78c98a7d`.
+Compile/link exit 0, zero undefined symbols, prelink/pack checks pass.
+`check-startup-snapshot.py` verifies a zero-slot startup record decodes its
+message buffer. This removes an observability dependency; it does not prove
+that storage writes succeed on hardware. Hardware validation pending.
+
+### Confirmed packaged-argument blocker: trailing sheng-log=0
+
+Snapshot extraction is 33,554,432 bytes, all zero. Inspecting the actual boot
+image revealed `sheng-log=1` inserted before the baseline's trailing
+`sheng-log=0`. XNU PE_parse_boot_argn_internal continues scanning numeric
+arguments; the last matching value overwrites earlier values. Both tick and
+UFS logMode therefore saw zero. Earlier claims that checking presence of
+`sheng-log=1` proved logging enabled were wrong. This explains why even the
+synchronous path produced no record, without requiring a scheduler theory.
+
+Packer now replaces the existing disabled setting and asserts exactly one
+`sheng-log=` occurrence. Reuses the snapshot kernel without recompilation.
+`staging/amethyst-log-enabled/Mu-amethyst-log-enabled.img`, SHA256
+`6c1c2cbb7e9f1ffae56817b2c3ecc15b732eb6472a50dcfb94aa6aa71f3c33ef`.
+Verified by extracting unixnu.toml from the new image's FAT payload: exactly
+one sheng-log=1, no sheng-log=0. Hardware test pending. No device operation
+performed by the agent.
+
+### Hardware success: enabled logging, boot ID 36da18c0
+
+User booted amethyst-log-enabled and extracted a valid SHLOG001 v4 window:
+46 rounds/slots, uptime 90 seconds, write_errors=0, msg_bytes=71967, state=2.
+Absolute first LBA 124206848, window 8192 blocks. Evidence copied beside image
+at `staging/amethyst-log-enabled/untagged-36da18c0/`; log.bin SHA256
+`63e3fc3ff10ce9b921a1a401a98c6ef8fe22471c9bf036f45f4d77db3d5be4f8`.
+
+Messages establish the actual sequence: BSD hook at 43.952956 s, parsed mode=1,
+synchronous snapshot refused with `no root layout`, writer thread created with
+status 0, writer entered at 46.914786 s, window opened at 47.931938 s,
+first round write/sync=1. Thus async startup and naming do work; storage becomes
+ready after the BSD hook, and the writer's retry handles that timing.
+
+Recorded service failures include watchdogd pids 52/94 exiting with signal 5,
+namespace=2/code=0x5, and repeated SpringBoard USER_BRK PC/LR 0x1a456b2ec.
+These addresses are not yet symbolicated. gpt=1/1 is not a successful GPT
+integrity check: the checker returns 1 when split-device Data-store geometry
+is invalid. Zero write errors establishes logger-reported success, not that
+separate integrity check. No new hardware boot is needed to inspect this log.
+
+### Enabled-run trap analysis (offline)
+
+`check-enabled-traps.py` in scratch passes against the hash-pinned original
+watchdogd. PC 0x1008e2b0c has one original BRK #1 candidate under a 16-KiB-aligned
+slide: 0x10000ab0c, slide 0x8d8000. Original instructions load string 0x10000ce37
+before the trap: `connect_to_kext() unexpectedly failed - unable to lookup
+watchdog KEXT service`. Second PC 0x100e71b0c maps uniquely to the same site
+under 4-KiB alignment, slide 0xe67000; a 16-KiB-only assumption misses it.
+These are candidate matches, not directly measured loaded-image bases.
+
+SpringBoard PC 0x1a456b2ec is consistent with the previous original-cache
+BRK #0 at unslid 0x19f3df2ec, inferred slide 0x518c000. Rechecked BRK bytes at
+cache .09 offset 0x62af2ec. Previous local-symbol/string analysis identifies
+`-[FBSDisplayMonitor _initWithBookendObserver:transformer:]` +0x47c and
+`failed to find the main CADisplay`. No new slide measurement was obtained.
+
+Thus main-display discovery and watchdog service lookup remain distinct
+functional boundaries. No trap or service-exit policy was patched. Next display
+experiment must combine the qualified display-only provider with the now-working
+logger, preserve owner-enabled UFS authorization, and assert exactly one enabled
+log argument. Do not boot the old display image expecting it to persist logs.
+
+### Display provider plus proven logger candidate
+
+Built `staging/amethyst-display-log/Mu-amethyst-display-log.img`,
+80,310,272 bytes, SHA256
+`dd13686267eb973e528b32911842d8833fa36184981ae513b86e49da0e7448f2`.
+Kernel 124,850,176 bytes, SHA256
+`69b90038257fb12de0a88b76af7e0ca203cccacea884f0e2dffc0b96ee8db55a`.
+Uses the enabled-run logger and owner-authorized log-capable UFS object.
+BSD source compiled with XNU_NATIVE_LEGACY_DISPLAY=1. Adds the previously
+audited display-only provider, late Legacy/presenter objects, original bindings,
+and scanout ownership primitives (not Sheng's renderer or peripheral probes).
+Adds only offline-mobile-graphics-load=1, offline-legacy-register=1 and
+offline-legacy-phase=4 to the logging baseline arguments; no invented unit scale.
+
+358-slot compiled ABI audit passes; compile/link exit 0, zero undefined symbols.
+Extracted-image check confirms exactly one enabled log setting, all three display
+settings, 17 segments and nonempty required prelink segments. Watchdog handling
+and storage bounds unchanged. Hardware untested; no agent device boot performed.
+Exact scratch link command: `.scratch/ufs-audit/logkit/display-log-link-command.json`.
+
+### Display-plus-log hardware result: stale log, not provider success
+
+User confirmed fastboot sent and handed off Mu-amethyst-display-log.img
+(78428 KB, both operations OKAY). Subsequent extraction still reports boot ID
+36da18c0, 46 rounds and 71967 message bytes; saved result-display/log.bin was
+byte-identical to the earlier enabled-run log (SHA256 63e3fc3f...d5be4f8).
+No new persistent log is established. Fastboot handoff is not XNU boot success.
+
+Source ordering explains the observability gap: native_mobile_graphics_load_probe
+runs immediately after vfsinit; its enabled path loads IOMobileGraphicsFamily
+and invokes native_legacy_display_probe. bsd_autoconf subsequently invokes
+native_legacy_display_late_probe before returning. Only after bsd_autoconf
+returns does amethyst_boot_log_start execute. Therefore either display phase
+can prevent the logger from starting. This is an ordering fact, not evidence
+identifying a particular failed call. Do not call this a successful display test
+or erase the previous log to manufacture a new result. Next integration must
+establish logging/root readiness before entering the experimental display path.
+
+### Durable-log gate before display experiment
+
+Moved the initial graphics load/probe from post-vfsinit and the late probe from
+inside bsd_autoconf to after bsd_autoconf and logger startup. Display calls are
+gated on a release/acquire flag set only after a successful header write and
+sync (or a complete periodic round). Wait uses IOSleep(10), bounded to ten
+seconds; on timeout display is skipped. Original display internals, watchdog
+handling, root authorization and write bounds are unchanged. Gate readiness
+establishes a log exists; it does not establish display success.
+
+Candidate `staging/amethyst-display-durable/Mu-amethyst-display-durable.img`,
+80,310,272 bytes, SHA256
+`12827315e930f35fcf04c1542435bf6ccb2950e4b8787b0082a9201430c3fad4`.
+Kernel SHA256 `53f635a14f0d9893193b54b331cd7ad5f42b206b3b74507bce999730aca12794`.
+Compile/link exit 0, zero undefined symbols, prelink/pack guards pass.
+`check-display-durable.py` verifies single display entry points follow the gate;
+startup snapshot decode check passes. Scratch BSD source is the patched build
+tree file; exact link command is logkit/display-durable-link-command.json.
+Hardware test pending. Build integration remains workspace-dependent.
+
+### Durable display run hardware result: gate passed, display path faulted
+
+User extracted result-display-durable: new boot ID 279746e5 (664225509),
+rounds=1, slots=1, write_errors=0, msg_bytes=19598. This is a genuinely new
+record, so the durable gate worked: the logger started, wrote its header,
+synced, and the writer opened the real window at LBA 124206848.
+
+The message buffer ends at `AmethystBootLog: window first=124206848 blocks=8192`
+with no `AmethystDisplay:` marker, no `NativeLegacyDisplay:` output, and no
+recorded writer round 1 line. The display gate releases the boot thread as soon
+as the durable flag is set, which happens inside the writer's first round just
+before its round-1 IOLog and its 2000 ms IOSleep. The fault therefore occurred
+inside the display load/probe before the writer's next message-buffer snapshot.
+The trap reason is only on the photographed screen; image analysis was not
+available to this session and the on-screen text was not transcribed.
+
+Absence of `NativeUfs: ...` or `NativeLegacyDisplay:` markers is not evidence
+that a specific call failed: the writer snapshots at 2 second intervals, so any
+messages emitted after round 1 were lost when the machine trapped.
+
+Candidate `staging/amethyst-display-flush/Mu-amethyst-display-flush.img`,
+80,310,272 bytes, SHA256
+`b65d963fadd4a41ac3ac48c8bcb03bcdbf09e56082df9dc99761e7d935dc2879`;
+kernel SHA256 `1fe966f1a4bbc995c570010eb456943f90a72a645b78ad963be2849520e51df5`.
+It adds `amethyst_boot_log_flush()`, a bounded synchronous checkpoint that
+writes the message region and a state=5 header, then syncs under
+IOLockTryLock so a busy writer causes a skip rather than a boot-thread stall.
+Flush checkpoints bracket the experiment: gate-wait-done, before-graphics-load,
+after-graphics-load, after-late-probe, plus gate-timeout. Display internals,
+watchdog handling, root authorization and UFS bounds are unchanged.
+Compile/link exit 0, zero undefined symbols, prelink and pack guards pass,
+`check-display-flush.py` and `check-display-durable.py` pass. Hardware untested.

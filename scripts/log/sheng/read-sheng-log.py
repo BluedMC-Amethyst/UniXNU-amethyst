@@ -18,9 +18,7 @@ import re
 import select
 import struct
 import sys
-import termios
 import time
-import tty
 import zlib
 from pathlib import Path
 
@@ -118,6 +116,9 @@ def decode(blob, out):
 
 class Port:
     def __init__(self, path):
+        import termios
+        import tty
+
         self.fd = os.open(path, os.O_RDWR | os.O_NOCTTY)
         tty.setraw(self.fd)
         attrs = termios.tcgetattr(self.fd)
