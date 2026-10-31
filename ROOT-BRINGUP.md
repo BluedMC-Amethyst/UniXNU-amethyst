@@ -157,6 +157,25 @@ embedded UUID checks passed. Hardware untested. The earlier data-clean folder
 contains an invalid intermediate explicitly marked DO-NOT-BOOT; it is not this
 candidate. No phone storage writes were made.
 
+### Small RAM Data hardware result
+
+Photo `_X8A0091.JPG` beside the data-small candidate confirms execution through
+`Early boot complete. Continuing system boot.` The earlier tzinit termination
+is no longer the stopping point. The small candidate boots where the large
+candidate had no visible firmware checkpoint; this supports a size/placement
+regression but does not identify the bootloader's exact constraint.
+
+The photo reports crashes in bluetoothd, SpringBoard, contextstored, seserviced
+and CommCenter, with `Too many corpses being created`. The terminal panic names
+`watchdogd` exiting with namespace 22, subcode 0x55, description `none`.
+Repeated trust-cache-query refusal messages are also visible, but the image
+does not establish their causal relationship to those crashes. No individual
+process exception backtrace or crash report is available from this photo.
+
+Next obtain process exit/crash evidence or targeted RAM-only diagnostics before
+changing AMFI, watchdog policy or hardware-driver selections. Do not suppress
+the watchdog panic as a substitute for diagnosing the service failures.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
