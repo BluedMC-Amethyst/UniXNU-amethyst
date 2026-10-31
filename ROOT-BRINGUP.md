@@ -312,6 +312,15 @@ builds Sheng-specific touch/GPU/power/audio/Wi-Fi integrations and must not be
 run wholesale on SM7635. The minimal display-only dependency extraction and
 original-method binding audit remain before a safe Amethyst test candidate.
 
+The recovered generator's original-binding audit now passes against the local
+compiled Legacy object and actual kernel-union image: complete 358-slot vtable,
+exact owned overrides, all original-class imports, IOSurface getter instruction
+checks, original refresh sender/property bodies and constructor/destructor
+chains. Generated bindings remain isolated in scratch. This is static evidence,
+not proof that lifecycle/publication runs on Amethyst. Upstream publication
+code calls Sheng-specific peripheral probes; those must be excluded rather
+than supplied as pretend-success stubs. No display boot image is ready yet.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
