@@ -331,6 +331,33 @@ hooks are unresolved in this static kernel baseline. Resolve the console/
 scanout ownership contract before enabling framebuffer transfer; no no-op
 ownership stubs or hardware image were produced.
 
+### Scanout ownership resolved; display kernel links
+
+The four missing hooks are owned by UniXNU-sheng `package/BootProgress.c` at the
+same revision. Importing that file wholesale would drag in Sheng's boot-progress
+console renderer (font drawing, log ring, pexpert console takeover), which is
+unrelated to display discovery and would give a second writer access to the
+firmware framebuffer.
+
+Instead only the ownership primitives were extracted to
+`.scratch/ufs-audit/display-recovered/BootScanoutOwnership.c`: the
+`prepare`/`cancel`/`pulse_anchor`/`stage` entry points, the atomic
+`yield_requested`/`render_busy` handshake, and the truthful
+`boot_progress_display_owned` flag. `pulse_anchor` returns 0 (no diagnostic
+anchor is registered because this kernel has no renderer) and `prepare_scanout`
+returns 0 instead of stealing a frame from a busy writer. The object imports
+only `_absolutetime_to_nanoseconds` and `_mach_absolute_time`. Hooks are C linkage;
+the recipe compiles this file as C++, so they are pinned in an `extern "C"` block.
+
+The isolated link then succeeds (exit 0) with zero undefined symbols:
+`NativeLegacyDisplay.late.o`, `NativeGOPPresenter.late.o`,
+`AmethystDisplayProbe.o`, `original-bindings.o` and `BootScanoutOwnership.o`
+against the unchanged baseline kernel
+(`.scratch/ufs-audit/display-recovered/kernel-native.macho`). The Legacy class,
+its metaclass entries and both lifecycle probes are present with no external
+imports. This is a host-side link result only; nothing has been booted.
+
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
