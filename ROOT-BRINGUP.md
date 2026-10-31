@@ -254,6 +254,26 @@ exact loaded-image base evidence is still needed before claiming a match.
 Next symbolicate SpringBoard's shared-cache trap and qualify watchdog image
 base/branch. Do not patch either BRK instruction or suppress exception handling.
 
+### Original binary/cache symbolication inputs verified
+
+Actions run 41173567856 succeeded; every downloaded artifact passed SHA-256.
+The original watchdogd hash matches the existing branch-test pin:
+`ded4c688e1c2add74acf3e7f9eea5fe2c2c569180ce81492221877944d913a01`.
+
+Searching original executable cache mappings for BRK #0 sites congruent with
+the photographed SpringBoard PC at possible 16 KiB-aligned slides up to the
+cache maximum yields one candidate: unslid 0x19f3df2ec, inferred slide 0x43fc000,
+dyld_shared_cache_arm64.09 offset 0x62af2ec. Original local symbols place it in
+`-[FBSDisplayMonitor _initWithBookendObserver:transformer:]` +0x47c.
+The adjacent original CFString assertion is `failed to find the main CADisplay`.
+This is a unique instruction/symbol/string match under the stated slide search,
+not direct observation of the hardware shared-region slide register/state.
+
+The next functional boundary is main-display discovery through the actual
+display service/provider chain. A framebuffer text console alone does not
+establish that CADisplay discovery or UI rendering works. Watchdog remains a
+separate service issue; no breakpoint instructions were modified.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
