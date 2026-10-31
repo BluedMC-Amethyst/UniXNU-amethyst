@@ -296,6 +296,22 @@ Method signatures, object allocation/lifecycle and provider publication remain
 unqualified. The header/generator search found no matching artifacts in local
 trees or queried upstream paths; no runnable display candidate was produced.
 
+### Legacy generator located in the Sheng board repository
+
+The matching generator is owned by UniXNU/UniXNU-sheng, not UniXNU core:
+`scripts/build-gop-legacy-display.py` at
+`08cde20edc3254ed6f7df8d0f5384fb887786e8f`. It generates the opaque Legacy
+header and checks compiled vtable slots against original family targets.
+`package/LegacyDisplayProbe.cpp` supplies the publication/provider integration.
+
+Its header-generation portion was replayed against the independently checked
+358-slot audit, in scratch only. The local NativeLegacyDisplay.cpp then compiled
+successfully against the actual ARM64 kernel recipe (warnings recorded).
+It is not linked or hardware-qualified. The complete upstream generator also
+builds Sheng-specific touch/GPU/power/audio/Wi-Fi integrations and must not be
+run wholesale on SM7635. The minimal display-only dependency extraction and
+original-method binding audit remain before a safe Amethyst test candidate.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
