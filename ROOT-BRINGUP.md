@@ -136,6 +136,27 @@ Compilation, isolated link/prelink, exact FAT file round-trips and size-handoff
 checks pass. No phone storage writes were made. Data mount and memory capacity
 remain hardware-untested; RAM Data changes are lost on reboot.
 
+### Clean seed / smaller Data candidate
+
+The large Data candidate transferred and received Booting OKAY, but the user
+observed no firmware checkpoint and the device remained/reappeared in fastboot.
+The reported 768 MiB download limit exceeds the 303636480-byte image; the exact
+early failure cause is unconfirmed.
+
+Actions run 41169591242 excludes staged apps before APFS writes, avoiding
+nonzero blocks left after copy-then-delete. Its verified 2 GiB seed packs to
+1011840 bytes, versus 247140928 previously. Logical SHA-256 is
+`0ce5f13c50c9723fbc6033590d41143a30b7218d22b63b595fbbf96597f64516`;
+UUID is `A173DCC8-1F31-46ED-9F67-DB2A68FC25DE`.
+
+`Mu-amethyst-owner-data-small.img` restores the known-working 160 MiB payload,
+uses that exact UUID in the rebuilt kernel, and is 80248832 bytes compressed.
+SHA-256: `37a1baaa281e924be30aff01d5f04f26de1cb1173520938935c523c570095287`.
+Seed hash/packing, compilation, link/prelink, payload round-trips and final
+embedded UUID checks passed. Hardware untested. The earlier data-clean folder
+contains an invalid intermediate explicitly marked DO-NOT-BOOT; it is not this
+candidate. No phone storage writes were made.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
