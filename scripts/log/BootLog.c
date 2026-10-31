@@ -268,6 +268,9 @@ volatile uint32_t amethyst_boot_log_durable;
 volatile uint64_t boot_log_first_lba;
 static int boot_log_started;
 static uint8_t *boot_log_buffer;   // LogMsgBlocks blocks: the message buffer, then reused for a slot and the header
+// Its own buffer: the writer thread owns boot_log_buffer and may be mid-round at
+// panic time. Allocated with the logger so panic context never allocates.
+static uint8_t *boot_log_panic_buffer;
 static uint64_t startup_first, startup_blocks, startup_boot_id;
 
 // The export: boot_log_export_put takes the blob's pieces in order (any thread) and writes them through a staging buffer straight into
@@ -1606,7 +1609,7 @@ static uint32_t copy_msgbuf(uint8_t *out) {
 // busy writer simply skips this flush instead of blocking a boot thread.
 volatile uint32_t amethyst_boot_log_flushes;
 int amethyst_boot_log_flush(const char *why) {
-  if (boot_log_state == 0 || !boot_log_buffer || !startup_blocks) return -1;
+  if (boot_log_state == 0 || !boot_log_panic_buffer || !startup_blocks) return -1;
   if (!IOLockTryLock(export_lock)) return -2;
   struct boot_log_header h;
   memset(&h, 0, sizeof h);
@@ -1620,10 +1623,10 @@ int amethyst_boot_log_flush(const char *why) {
   h.slot_first = LogSlotFirst; h.slot_blocks = LogSlotBlocks;
   h.slot_count = (uint32_t)((startup_blocks - LogSlotFirst) / LogSlotBlocks);
   h.state = 5;                     // checkpoint flush, not a writer round
-  h.msg_bytes = copy_msgbuf(boot_log_buffer);
+  h.msg_bytes = copy_msgbuf(boot_log_panic_buffer);
   h.slots_written = boot_log_rounds;
   h.uptime_s = 0;
-  int ok = native_ufs_log_write(LogMsgFirst, LogMsgBlocks, boot_log_buffer);
+  int ok = native_ufs_log_write(LogMsgFirst, LogMsgBlocks, boot_log_panic_buffer);
   ok &= native_ufs_log_write(0, 1, (const uint8_t *)&h);
   ok &= native_ufs_log_sync();
   ++amethyst_boot_log_flushes;
@@ -1646,6 +1649,12 @@ static void writer(void *arg, wait_result_t result) {
     IOSleep(1000);
   }
   boot_log_first_lba = first;
+  // Publish the window the writer finally got, not just the startup attempt. The
+  // startup open usually fails with "no root layout" before NativeUfs has read the
+  // root store, so these statics would otherwise stay zero and the panic hook (and
+  // amethyst_boot_log_flush) would refuse to write exactly when they are needed.
+  startup_first = first;
+  startup_blocks = blocks;
   IOLog("AmethystBootLog: window first=%llu blocks=%llu\n", first, blocks);
   const uint32_t slot_count = (uint32_t)((blocks - LogSlotFirst) / LogSlotBlocks);
   if (&native_ufs_export_blocks && &native_ufs_export_write) {
@@ -1658,6 +1667,7 @@ static void writer(void *arg, wait_result_t result) {
   memcpy(h.magic, "SHLOG001", 8);
   h.version = 4; h.header_bytes = sizeof h;
   h.export_blocks = export_region; h.export_below = export_region; h.boot_id = log_ticks(); h.first_lba = first; h.window_blocks = (uint32_t)blocks;
+  startup_boot_id = h.boot_id;   // the panic record must carry the same run identity as the rounds
   h.msg_first = LogMsgFirst; h.msg_blocks = LogMsgBlocks; h.slot_first = LogSlotFirst; h.slot_blocks = LogSlotBlocks; h.slot_count = slot_count;
   h.gpt_open = h.gpt_last = &native_ufs_store_gpt_check ? native_ufs_store_gpt_check() : 0xff;
   if (&boot_progress_tag) strlcpy(h.tag, boot_progress_tag(), sizeof h.tag);
@@ -1754,9 +1764,9 @@ static int boot_log_panic_fired;
 static void boot_log_panic_record(const char *str) {
   // Runs at most once: a nested panic must not rewrite the record or recurse.
   if (__atomic_exchange_n(&boot_log_panic_fired, 1, __ATOMIC_ACQ_REL)) return;
-  if (!boot_log_buffer || !startup_blocks || boot_log_state == 0) return;
+  if (!boot_log_panic_buffer || !startup_blocks || boot_log_state == 0) return;
   if (!&native_ufs_log_write) return;
-  uint8_t *out = boot_log_buffer;
+  uint8_t *out = boot_log_panic_buffer;
   const uint32_t cap = LogMsgBlocks * LogBlock;
   memset(out, 0, cap);
   // Header first, then the panic text, then the live message buffer: the last
@@ -1819,6 +1829,8 @@ void boot_log_tick(unsigned now) {
   if (!&native_ufs_log_open || !&native_ufs_log_write || !&native_ufs_log_sync) return;
   boot_log_buffer = (uint8_t *)IOMallocAligned(LogMsgBlocks * LogBlock, LogBlock);
   if (!boot_log_buffer) { IOLog("AmethystBootLog: buffer allocation failed\n"); return; }
+  boot_log_panic_buffer = (uint8_t *)IOMallocAligned(LogMsgBlocks * LogBlock, LogBlock);
+  if (!boot_log_panic_buffer) IOLog("AmethystBootLog: panic buffer allocation failed\n");
   export_lock = IOLockAlloc();
   if (!export_lock) { IOLog("AmethystBootLog: lock allocation failed\n"); return; }
   boot_log_install_panic_hook();

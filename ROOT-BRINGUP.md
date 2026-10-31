@@ -875,3 +875,70 @@ confirmed to live in the writable `__data` segment, not `__const`.
 This exists because the display-flush transcript's real abort PC was destroyed
 by transcription. The next run should report the exact panic text and the last
 pre-panic messages as files, with no screen reading required. Hardware untested.
+
+### Second screen transcript: identical userspace panic, registers unreadable
+
+A second transcription (panicking address differs, OCR mangled) shows the same
+sequence: CryptexSystem volume mounts, OwnerData mounts, launchd loads, two
+`check_np` ENOMEM probes, then `panic(cpu 0 caller 0xfffffff000bfd56c):
+Kernel data abort.`
+
+The register dump is not usable. OCR doubled every character and interleaved
+glyphs, so `pc`, `lr`, `far` and `esr` cannot be reconstructed with confidence;
+no candidate value from either transcript falls inside any segment of the
+tested kernel. This is recorded so the reconstruction is not mistaken for
+evidence.
+
+Consistent with the earlier finding, the two `check_np` failures also appear in
+the successful boot (48.372560 and 48.386938 s) and cannot be the fault.
+
+Because the panic-hook image's only difference from the display-flush image is
+the UFS record, the screen output of the two builds is identical. A transcript
+alone therefore cannot say which build ran; only the pulled log can.
+
+### Root cause of the userspace data abort: freed display object
+
+The panic-hook image's own transcript carried readable values this time:
+`pc 0xfffffff00bfeebf8`, `far 0x1158`, `esr 0x96000005`. Note the transcribed pc
+has one extra hex digit; dropping it gives a value inside `__TEXT_EXEC`, which is
+how it was symbolicated. ESR 0x96000005 = data abort, translation fault; FAR
+0x1158 is a NULL pointer plus 0x158. `llvm-nm` places the pc at
+`native_legacy_properties_now + 0x48`, and the instruction there is
+`ldr x8, [x8, #0x158]` where `x8` came from `[x20]` and `x20` from the
+`native_legacy_object` global. So the object's vtable pointer was zero: it had
+been freed.
+
+Source confirms the mechanism. `native_legacy_object` is published for
+diagnostics but holds no reference, and both probe exit paths call
+`display->release()` (`AmethystDisplayProbe.cpp` lines 477 and 582), freeing the
+object once its last reference drops. The writer's second round then calls
+`compose()`, which calls `native_legacy_properties_now()`, which dereferenced the
+stale pointer. The first round's header survives; the second round faults, which
+is why the saved log stops at `window first=...` with `slots_written=1`.
+
+Two further defects made this hard to see, both fixed here:
+
+1. The writer published nothing. `native_ufs_log_open` fails at startup with
+   "no root layout", so `startup_first`/`startup_blocks`/`startup_boot_id` stayed
+   zero after the writer later opened the window in its own locals. Both the
+   flush path and the panic hook therefore returned early and wrote nothing. The
+   writer now publishes the window and boot id it actually got.
+2. The flush and panic hook borrowed `boot_log_buffer`, which the writer thread
+   owns and may be mid-round in. They now share a separate pre-allocated
+   `boot_log_panic_buffer`; panic context never allocates.
+
+Fixes: `native_legacy_properties_now` refuses a released object
+(`if(!display || native_legacy_released)return 0;`); the writer publishes its
+window; the panic/flush path has its own buffer. Note the guard had to be made in
+`.scratch/ufs-audit/upstream-LegacyDisplayProbe.cpp`, because
+`compile-display-provider.py` regenerates `AmethystDisplayProbe.cpp` from it and
+silently discarded the first attempt.
+
+Candidate `staging/amethyst-display-guard/Mu-amethyst-display-guard.img`,
+80,310,272 bytes, SHA256
+`efb9a31edbbe6c9faa1c5080f0d9bb2ed826ab90aa41162e8c040cead5ad237c`;
+kernel SHA256 `ea2fc6489d401f0e3fcff6abbfb842f14f78c19551dfde79cb466932a1de5bbb`.
+Disassembly of the linked kernel confirms the released-object branch before the
+vtable load. Compile/link exit 0, zero undefined symbols, prelink and pack guards
+pass, all eight checks pass. Watchdog handling, root authorization and UFS write
+bounds unchanged. Hardware untested.
