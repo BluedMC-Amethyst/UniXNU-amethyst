@@ -42,6 +42,23 @@ flashing the boot image. No root-image reflash or repartitioning is required.
 
 ## Reproducibility limitation
 
+## SystemOS mount result and cache-carrier candidate
+
+Photo `_X8A0087.JPG` beside the owner-cache image confirms SystemOS APFS mount
+completion. Cache mapping then fails with `not on process' root volume nor
+preboot volume`, followed by the missing libSystem/no dyld cache termination.
+Thus mounting SystemOS alone did not satisfy the shared-region carrier policy.
+
+The next candidate enables the existing `XNU_OWNER_CACHE_CARRIER` development
+instrument in vm_unix.c. It requires read-only APFS root/cache mounts, the exact
+signed OS/SystemOS UUIDs and devices, and the expected cache parent directory.
+It does not unconditionally accept an arbitrary cache mount.
+
+`Mu-amethyst-owner-carrier.img` SHA-256:
+`45b06bcb5f30dfda9f6ee6912e0a2427736ccdc9b5d0f924bb84f59fbe49d4bb`.
+Compilation, link, prelink and packaging comparisons passed; hardware untested.
+The config, ADT, trust caches, shim, firmware body and DTB remain unchanged.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
