@@ -1,0 +1,46 @@
+name: Extract original root symbolication inputs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - name: Extract pinned original binaries and caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 -o firmware.ipsw 'https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw'
+          unzip -p firmware.ipsw 044-76040-038.dmg > os.dmg
+          unzip -p firmware.ipsw 044-76034-038.dmg > systemos.dmg
+          echo '3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d  os.dmg' | shasum -a 256 -c -
+          echo 'b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f  systemos.dmg' | shasum -a 256 -c -
+          rm firmware.ipsw
+          mkdir -p os-mount systemos-mount output/cache output/binaries
+          OS="$PWD/os-mount"
+          SYSTEM="$PWD/systemos-mount"
+          trap 'hdiutil detach "$SYSTEM" || true; hdiutil detach "$OS" || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$OS" os.dmg
+          hdiutil attach -readonly -nobrowse -mountpoint "$SYSTEM" systemos.dmg
+          cp "$OS/usr/libexec/watchdogd" output/binaries/watchdogd
+          cp "$OS/System/Library/CoreServices/SpringBoard.app/SpringBoard" output/binaries/SpringBoard
+          cp "$SYSTEM/usr/lib/libobjc-trampolines.dylib" output/binaries/
+          cp "$SYSTEM"/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64* output/cache/
+          (cd output && find binaries cache -type f -exec shasum -a 256 {} \; > SHA256SUMS)
+          xcrun dwarfdump --uuid output/binaries/watchdogd > output/binary-uuids.txt
+          xcrun dwarfdump --uuid output/binaries/SpringBoard >> output/binary-uuids.txt
+          hdiutil detach "$SYSTEM"
+          hdiutil detach "$OS"
+          trap - EXIT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amethyst-21H461-symbolication-inputs
+          path: output/
+          if-no-files-found: error
+          retention-days: 7
