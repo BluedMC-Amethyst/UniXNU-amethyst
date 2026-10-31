@@ -1,0 +1,4 @@
+*.o
+BootLogStubsGenerated.c
+*-compile.log
+__pycache__/

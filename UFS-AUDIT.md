@@ -61,3 +61,13 @@ Full kernel build and prelink: PASS with the same command above; updated kernel
 SHA-256 `14ac7f50dec39bb834883c32d94f088e15bbfafbc87145dfd72df4cead34ec8e`.
 Hardware status is unchanged: takeover disabled by default, stall cause unknown,
 no new phone image or device test performed.
+
+## Subsequent UFS-off hardware observation
+
+User reports the same stall with the UFS-off candidate, image SHA-256
+`74201b3014b3d5cfb0707a0b9be459f7dcc9d532a39770b10186358928dea0a0`.
+The packed boot configuration explicitly sets native-ufs-root=0 and has no
+probe argument. Active controller/SMMU takeover is therefore not required to
+reproduce the symptom under the driver's start gate. This does not rule out
+linked-driver integration, prelink changes, or other kernel/ADT differences.
+Do not attribute the green-screen regression to takeover without new evidence.

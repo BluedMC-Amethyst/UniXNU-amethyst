@@ -496,3 +496,73 @@ maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
 policy-generation checks and device/provider authorisation changes remains
 required; do not represent this candidate as a released or qualified build.
+
+## A real boot log instead of photographs
+
+Every result above had to be read off the screen by hand, because Amethyst has no
+usable serial console: its device tree carries no `boot-console`/`uart0`/`uart1`
+node, and SM7635 reaches eUSB2 through the PMIC rather than a DWC3 block, so
+there is no CDC-ACM path either. sheng's `package/BootLog.c` (boot argument
+`sheng-log=1`) solves this without any new hardware: it stores the kernel
+message buffer into the `NativeUfs` log window every two seconds, and the window
+can then be read back over ADB.
+
+### The log window lives in `unixnu`
+
+`NativeUfs` used to disable logging whenever the root image was in a split
+partition, because the log window and the Data store shared one geometry and the
+Data store is deliberately refused there. The log is read-only with respect to
+both filesystems, so it now has its own geometry (`rootLogGeometry` in
+`RootLayout.h`): the last 8192 blocks (32 MiB) of whichever partition carries the
+root image. On this device that is `unixnu`, so **Android's `userdata` is never
+written** -- the 32 MiB window sits in the ~122 GiB free tail of `unixnu`,
+clear of the 8.74 GiB root image plus a 4 MiB guard.
+
+### An out-of-bounds read in the upstream writer
+
+`BootLog.c` declared `native_swipe_stats[16]` and then printed
+`native_swipe_stats[16]`, one element past the end, in the `[swipe2]` row. The
+same line exists in `UniXNU-sheng` at `08cde20`, so this is a genuine upstream
+defect rather than a porting artefact. `TouchProbe.cpp` writes the "heavy" start
+timestamp to slot **8** (immediately before the Control Center strokes) and that
+slot is otherwise never displayed; the reader meant 8. Corrected to `[8]`.
+
+### Linking a static kernel against the writer
+
+`BootLog.c` reads every optional probe through `weak_import`, but a static kernel
+link still needs a definition for each one. asteroids' `BootLogStandins.c` was
+generated against a newer sheng build and leaves 94 symbols undefined on this
+board (the adreno buffer/diag arrays, `native_legacy_*` probe arrays, cpufreq,
+keyevents, mic, and the board-page renderer buffers). Rather than hand-writing
+them, `gen-standins.py` parses `BootLog.c`'s own `weak_import` declarations and
+emits a definition of the identical type -- weak, so a real driver always wins,
+and reading as zero/empty so the log prints those rows blank. Functions get weak
+no-ops returning 0/NULL so `if (&fn)` stays false, which is what "not available"
+means to the writer.
+
+`bsd_init.c` now calls `amethyst_boot_log_start()` after `bsd_autoconf()`, which
+starts a small thread that ticks `boot_log_tick()` once a second. sheng's own
+ticker lives in `BootProgress.c`, which also carries the console *renderer*
+(font drawing, log ring, pexpert takeover) that this kernel has no console for, so
+only the one call is reproduced.
+
+### Log candidate
+
+`staging/amethyst-log/Mu-amethyst-log.img`, 80,285,696 bytes, sha256
+`3a6d3531f2e6455dde520bb92fccf8c9c63b93ca4593381cc2e42c251aeb3f74`.
+
+Rebuilt from the proven baseline with one kernel variable and one boot argument.
+Verified in-image: kernel 124,764,160 bytes (baseline 124,518,400; the difference
+is the log code) with every real prelink segment populated -- `__PRELINK_TEXT`
+6,963,200 bytes, `__PLK_TEXT_EXEC` 20,447,232 bytes, `__PRELINK_INFO` 483,328,
+`__PRELINK_DATA` 1,392,640, `__PLK_DATA_CONST` 3,555,328 -- and
+`amethyst_boot_log_start`, `boot_log_tick`, `native_ufs_log_open` and
+`native_ufs_log_write` all resolved. ADT, trust cache and the packed Data seed
+are byte-identical to the baseline. Args add only `sheng-log=1`. Untested.
+
+Read the result back with `pull-log.py`: it resolves `unixnu`'s start and size
+from the recovery shell, copies the last 32 MiB to `/tmp` (RAM), pulls it, and
+decodes with sheng's `read-sheng-log.py`. A window whose header magic is absent
+means the writer never started, which is reported distinctly from a decode error.
+Nothing is written to the phone.
+
