@@ -79,6 +79,21 @@ Compilation, isolated link with no undefined symbols, prelink and packaging
 checks passed. Config, ADT, trust caches and firmware remain unchanged.
 Hardware execution of metadata publication is untested. Data stays disabled.
 
+## Owner-manifest hardware result: Data boundary
+
+Photo `_X8A0089.JPG` beside the owner-manifest image shows launchd progressing
+through additional boot tasks, beyond the previous missing boot-manifest error.
+The visible fatal sequence is now tzinit reporting inability to locate Data,
+an attempted system-partition reset failing with a read-only filesystem, and
+PID 17 termination. Earlier boot tasks also report read-only paths under
+`/private/var`. Transcription is from the supplied photo, not a captured log.
+
+This is consistent with the known absence of a writable iPadOS Data seed/mount.
+It does not justify enabling raw persistence on Android userdata or making the
+authenticated root writable. Next inspect the existing RAM-backed Data seed and
+owner Data mount path; persistent allocation requires a separately reviewed
+write plan. No further root-image flash or repartitioning is indicated.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
