@@ -943,49 +943,97 @@ vtable load. Compile/link exit 0, zero undefined symbols, prelink and pack guard
 pass, all eight checks pass. Watchdog handling, root authorization and UFS write
 bounds unchanged. Hardware untested.
 
-### Nested-panic cascade: this board has no panic region
+### The green-bar freeze was my object build, not the panic fix
 
-The display-guard transcript shows `round=1 write/sync=1` (the flush fix is live),
-then `Nested panic detected`, a mutex-unexpectedly-owned abort at lock_mtx.c:175,
-`Nested panic count: 3`, `pe_init.c:707 Assertion failed: panic_info`, count 4,
-count exceeds limit 5, then `Nested panic stall. Stage 2 bailout`.
+The candidate carrying the nested-panic fix froze at the green iBoot bar before
+XNU printed anything, and no log could be pulled. The fix itself was never at
+fault. The object was rebuilt by hand with the wrong flags.
 
-Root cause of the cascade is a pre-existing kernel/board mismatch, not the
-display work. `check_for_panic_log()` (pexpert/arm/pe_init.c) obtains the panic
-region from either `PLATFORM_PANIC_LOG_PADDR` or the device tree's `pram` node
-plus `/chosen/embedded-panic-log-size`. This build defines
-`PLATFORM_PANIC_LOG_PADDR 0x3c0fc000` in pexpert/pexpert/arm64/BCM2837.h, which
-is a Raspberry Pi 3 DRAM window and meaningless on this SoC, and the Amethyst
-device tree has neither `pram` nor `embedded-panic-log-size` (checked with dtc
-against .scratch/ufs-audit/owner-baseline.dtb). So `gPanicBase` and `panic_info`
-stay 0 for the whole boot.
+Two flags were missing, and neither produces a compile error:
 
-`PE_update_panicheader_nestedpanic()` asserted on that NULL, which is only
-reachable when a second panic occurs. The first fault is therefore converted into
+| Missing flag | Effect | How it shows |
+| --- | --- | --- |
+| `--target=arm64-apple-ios17.0` | clang falls back to the host triple and emits a **macOS** arm64 object; `-arch arm64` still succeeds | `ld: building for iOS, but linking in object file built for macOS` |
+| `-DXNU_DT_PANIC_REGION=1` | the kernel takes the `PLATFORM_PANIC_LOG_PADDR` path (`0x3c0fc000`, a Raspberry Pi 3 address) instead of the device tree | `__text` is 0x1224 instead of 0x1180; no `pram` string; `ml_io_map_wcomb` called before any `SecureDTLookupEntry` |
+
+`.CFLAGS` in the pexpert build directory contains `-arch arm64` and
+`-miphoneos-version-min=17.0` but **not** `--target`, and never contains
+`XNU_DT_PANIC_REGION`. The build adds the triple through `KCC` and the define
+per object through
+`pe_init.o_CFLAGS_ADD=-DXNU_DT_PANIC_REGION=$DT_PANIC_REGION`
+(scripts/build-xnu-4k-baseline.sh). Both have to be supplied by hand.
+
+With both flags present, the rebuilt `pe_init.o` is **byte-identical** to the
+shipped object (136,416 bytes, `cmp` clean, all sections matching), and
+relinking reproduces `kernel-guard.macho` exactly apart from the 16-byte UUID at
+offset `0x14a8`. The full recipe and the traps are in
+[OBJECT-BUILD.md](OBJECT-BUILD.md).
+
+One further trap found while verifying: the object must be linked **from its
+original path**. Linking the identical object from another directory shifts the
+kernel by 96 bytes, because the path reaches the debug and string tables.
+
+### Nested-panic cascade: the board provides no usable panic region
+
+Separate from the freeze above, and still valid. The display-guard transcript
+shows `round=1 write/sync=1` (the flush fix is live), then `Nested panic
+detected`, a mutex-unexpectedly-owned abort at lock_mtx.c:175, `Nested panic
+count: 3`, `pe_init.c:707 Assertion failed: panic_info`, count 4, count exceeds
+limit 5, then `Nested panic stall. Stage 2 bailout`.
+
+`check_for_panic_log()` (pexpert/arm/pe_init.c) obtains the panic region from the
+device tree's `pram` node plus `/chosen/embedded-panic-log-size`. The Amethyst
+device tree has neither, checked with `dtc` against
+`.scratch/ufs-audit/owner-baseline.dtb`. The alternative path is
+`PLATFORM_PANIC_LOG_PADDR 0x3c0fc000` from pexpert/pexpert/arm64/BCM2837.h,
+which is a Raspberry Pi 3 DRAM window and meaningless on this SoC. Either way
+`gPanicBase` and `panic_info` stay 0 for the whole boot.
+
+`PE_update_panicheader_nestedpanic()` asserts on that NULL, and it is only
+reachable when a second panic occurs. The first fault therefore becomes
 assert -> panic -> nested -> mutex abort -> reset, and the original panic text is
-destroyed before anything can persist it. This is why two runs in a row lost the
+destroyed before anything can persist it. That is why two runs in a row lost the
 real fault even though the logger was writing.
 
-Fix: that function now returns without the assertion when `panic_info` is NULL.
-Nesting is still reported by the caller (`check_and_handle_nested_panic` prints
-the nested panic string and count), so only the header maintenance that has no
-storage to update is skipped. Nothing suppresses the original panic.
+The proposed fix makes that function return without asserting when `panic_info`
+is NULL. Nesting is still reported by the caller
+(`check_and_handle_nested_panic` prints the nested panic string and count), so
+only header maintenance with no storage to update is skipped. Nothing suppresses
+the original panic.
 
-Building it required `pe_init.c` to be compiled standalone: the bsd owner recipe
-lacks `<pexpert/pe_images.h>` (generated, not exported), so the command appends
-`-I xnu-work/pexpert` and `-DPEXPERT_KERNEL_PRIVATE=1`. Compile and link exit 0
-with zero undefined symbols; the linked kernel branches (`cbz x8`) at
-`PE_update_panicheader_nestedpanic+0x14` instead of asserting.
-
-Candidate `staging/amethyst-nested-panic/Mu-amethyst-nested-panic.img`,
-80,310,272 bytes, SHA256
-`38b14508870f7a03b2d6e6118f4805cfad2a890c38627125738c30da32fa4fea`;
-kernel SHA256 `8d36c01e4ec1617764ff3a5897093ba022a625db9f141daf503b0eeb323c1e93`.
-`check-nested-panic-fix.py` pins the board premise and the fix. All nine checks
-pass. Watchdog handling, root authorization and UFS bounds unchanged. Hardware
-untested.
+**Status: not shipped.** It is correct in itself, but it cannot be evaluated on
+hardware until a rebuild with the correct flags reaches XNU. The image that
+froze did not contain the fix as intended, so the earlier attempt proved nothing
+about it either way.
 
 The original fault is still unidentified. Its `panic_caller` values
 (0xfffffff000bf4434, 0xfffffff000bf1168) do not resolve to any instruction in the
 tested kernel after correcting for transcription digit doubling, so they were not
 used to name a function.
+
+### Recovery image
+
+`pe_init.c` is restored to the revision the shipped object was built from, with
+the nested-panic fix removed, so line 707 holds `assert(panic_info)` again.
+
+The kernel was relinked from the unmodified filelist and reproduces
+`kernel-guard.macho` exactly apart from the 16-byte UUID at `0x14a8`: identical
+size (92,008,368 bytes), zero undefined symbols, and all five prelink segments
+byte-identical in size to the last known-good image
+(`__PRELINK_TEXT` 6,963,200, `__PRELINK_INFO` 483,328, `__PLK_TEXT_EXEC`
+20,447,232, `__PRELINK_DATA` 1,392,640, `__PLK_DATA_CONST` 3,555,328).
+
+| Field | Value |
+| --- | --- |
+| Image | `staging/amethyst-recovery/Mu-amethyst-recovery.img` |
+| Size | 80,310,272 bytes |
+| SHA256 | `2292549bbfd826ef3c4f850619bf1eb73636b31e301cd900f62b3f2dd7b769c9` |
+| Prelinked kernel SHA256 | `5e5982aa117f6d97c813d1e7810d6c4219f9dba10fd8fdfebd1785cbc4d5a5dc` |
+
+Boot arguments and payloads are unchanged from `amethyst-display-guard`, the
+last image that reached launchd, including the single `sheng-log=1` and the
+display probe flags. Hardware untested.
+
+`check-object-build.py` rebuilds `pe_init.c` with the recorded recipe and fails
+unless the result is byte-identical to the shipped object, so a missing flag
+cannot pass unnoticed again. All ten checks pass.
