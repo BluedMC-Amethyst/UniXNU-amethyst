@@ -23,6 +23,7 @@ from pathlib import Path
 KIT = Path(__file__).resolve().parent
 DECODER = KIT / 'sheng' / 'read-sheng-log.py'
 BLOCK = 4096
+SECTORS_PER_BLOCK = 8  # sysfs reports 512-byte sectors; dd works in 4096-byte blocks
 LOG_BLOCKS = 8192  # NativeUfs kLogReserveBlocks
 PARTITION = 'unixnu'
 
@@ -32,27 +33,32 @@ def adb(*args, check=True):
 
 
 def partition_bounds(name):
-    """First LBA and block count of a partition, from the recovery shell.
+    """First LBA and block count of a partition, in 4096-byte blocks.
 
-    Accepts either the by-name symlink or the GPT table; recovery exposes
-    /dev/block/by-name but not always a partition table dump.
+    Recovery exposes /dev/block/by-name/<name>, but sysfs has no directory under
+    the GPT name: the kernel's entry is the partition node itself (`sda34`).
+    That entry reports start and size in **512-byte sectors**, not 4096-byte
+    blocks, so both are scaled here -- reading them as blocks would place the
+    window eight times too far into the disk.
     """
-    raw = adb('shell', f'readlink -f /dev/block/by-name/{name}').decode().strip()
-    match = re.search(r'/dev/block/(?:sd[a-z]|mmcblk\d+|nvme\d+n\d+p?)(\d+)$', raw)
-    if not match:
-        sys.exit(f'{name} resolves to {raw!r}, which has no partition number')
-    number = match.group(1)
-    # The kernel exposes the start and size of a named partition in sysfs.
-    base = f'/sys/class/block/$(basename $(readlink -f /dev/block/by-name/{name}))'
-    start = adb('shell', f'cat /sys/class/block/*{name}*/start 2>/dev/null || '
-                         f'cat {base}/start').decode().strip()
-    size = adb('shell', f'cat /sys/class/block/*{name}*/size 2>/dev/null || '
-                        f'cat {base}/size').decode().strip()
+    device = adb('shell', f'readlink -f /dev/block/by-name/{name}').decode().strip()
+    node = device.rsplit('/', 1)[-1]
+    if not node:
+        sys.exit(f'{name} did not resolve to a device node')
+    sysfs = f'/sys/class/block/{node}'
+    raw_start = adb('shell', f'cat {sysfs}/start 2>/dev/null').decode().strip()
+    raw_size = adb('shell', f'cat {sysfs}/size 2>/dev/null').decode().strip()
     try:
-        return int(start), int(size)
+        start_sectors, size_sectors = int(raw_start), int(raw_size)
     except ValueError:
-        sys.exit(f'could not read start/size for {name}: '
-                 f'start={start!r} size={size!r} (partition {number})')
+        sys.exit(f'{device} ({node}): could not read sysfs start/size '
+                 f'(got start={raw_start!r} size={raw_size!r})')
+    # sysfs always reports whole 512-byte sectors, whatever the device's logical
+    # sector size, so convert to the 4096-byte blocks dd will use.
+    if start_sectors % SECTORS_PER_BLOCK or size_sectors % SECTORS_PER_BLOCK:
+        sys.exit(f'{name}: {node} start={start_sectors} size={size_sectors} '
+                 f'is not a whole number of 4096-byte blocks')
+    return start_sectors // SECTORS_PER_BLOCK, size_sectors // SECTORS_PER_BLOCK, device
 
 
 def main():
@@ -63,6 +69,10 @@ def main():
     ap.add_argument('--partition', default=PARTITION)
     ap.add_argument('--device', default=None,
                     help='block device to read instead of looking up the partition')
+    ap.add_argument('--expect-first', type=int, default=90660608,
+                    help='expected first LBA in 4096-byte blocks; guards against '
+                         'reading the wrong region (default: unixnu first LBA per '
+                         'the partition plan). Pass 0 to disable.')
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
@@ -73,15 +83,22 @@ def main():
         skip = None
         region = args.device
     else:
-        start, blocks = partition_bounds(args.partition)
+        start, blocks, device = partition_bounds(args.partition)
+        if args.expect_first and start != args.expect_first:
+            sys.exit(f'{args.partition} starts at LBA {start}, not the expected '
+                     f'{args.expect_first}: this is not the layout the log window '
+                     f'was written against. Re-check the GPT before reading '
+                     f'(pass --expect-first 0 to override).')
         if blocks < LOG_BLOCKS:
             sys.exit(f'{args.partition} has {blocks} blocks, smaller than the '
                      f'{LOG_BLOCKS}-block log window')
         # The window is the last LOG_BLOCKS blocks of the partition.
         skip = start + blocks - LOG_BLOCKS
-        region = f'/dev/block/by-name/{args.partition}'
-        print(f'{args.partition}: start={start} blocks={blocks} '
-              f'-> log at LBA {skip}..{start + blocks - 1}')
+        region = device
+        print(f'{args.partition}: {device} start={start} blocks={blocks} '
+              f'({blocks * BLOCK / 2**30:.1f} GiB)')
+        print(f'log window: LBA {skip}..{start + blocks - 1} '
+              f'({LOG_BLOCKS * BLOCK // 2**20} MiB)')
 
     remote = '/tmp/amethyst-log.bin'
     command = f'dd if={region} of={remote} bs={BLOCK} count={LOG_BLOCKS} '
