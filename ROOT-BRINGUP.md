@@ -1037,3 +1037,68 @@ display probe flags. Hardware untested.
 `check-object-build.py` rebuilds `pe_init.c` with the recorded recipe and fails
 unless the result is byte-identical to the shipped object, so a missing flag
 cannot pass unnoticed again. All ten checks pass.
+
+### The mutex abort is our panic hook, not the assert
+
+The nested-panic cascade had a cause upstream of `assert(panic_info)`, and it was
+introduced by commit `9acdcbb` (the chained `PE_panic_hook`).
+
+`boot_log_panic_record` calls `native_ufs_log_sync()` to record whether the write
+reached the medium:
+
+```c
+live->synced = &native_ufs_log_sync ? native_ufs_log_sync() : 0;
+```
+
+`native_ufs_log_sync` is not a flush. Disassembled from the known-good kernel at
+`0xfffffff00bfc180c`:
+
+```text
+bl  _lck_mtx_lock
+...
+bl  __ZN12_GLOBAL__N_111hostScsiDirEhPKhjjjjPj
+bl  _lck_mtx_unlock
+```
+
+It takes a mutex and then issues a blocking SCSI command to the UFS device. Both
+are forbidden in a panic handler. The panic CPU either already holds the lock or
+the peer CPU is being parked, so the lock never falls free and
+`lck_mtx_lock` aborts with `Mutex ... is unexpectedly owned by thread` at
+`lock_mtx.c:175`.
+
+That abort is the first nested panic. It is not caused by the original fault, and
+it is not caused by `assert(panic_info)`; the assert is what turns the *third*
+panic into a machine reset.
+
+So the observed order in the transcript is:
+
+| Order | Event | Cause |
+| --- | --- | --- |
+| 1 | Original fault | Still unidentified |
+| 2 | `Nested panic detected` | `native_ufs_log_sync` in the panic hook |
+| 3 | Mutex unexpectedly owned, `lock_mtx.c:175` | Same |
+| 4 | `pe_init.c:707 Assertion failed: panic_info` | `panic_info` is NULL on this board |
+| 5 | Count exceeds limit, reset | Cascade |
+
+Both UFS entry points are unsafe, not just the sync:
+
+```text
+native_ufs_log_write -> hostWrite4k -> lck_mtx_lock, hostScsiDir
+native_ufs_log_sync  ->                lck_mtx_lock, hostScsiDir
+```
+
+So the panic hook now performs no device work at all. It records that a panic
+happened and leaves `wrote` and `synced` at 0.
+
+**What is lost, and why it is still the better trade.** The writer persists the
+message buffer every `LogPeriodMs` (2 s), so a panic between rounds can lose up
+to 2 s of text. `boot_progress_panic_text` is a weak stub that nothing writes, so
+it cannot recover that tail. The alternative was worse: any device access in the
+hook aborts on the mutex, which turns a clean panic into a cascade and loses the
+entire record, plus the pre-panic text, because the assert path resets the
+machine. Two seconds of possible loss against guaranteed total loss.
+
+Persistence now lives only in `amethyst_boot_log_flush`, which runs on the writer
+thread, uses `IOLockTryLock`, and is already proven (`round=1 write/sync=1`).
+`check-panic-hook-lock.py` fails if the hook ever regains a device call or a
+blocking lock.

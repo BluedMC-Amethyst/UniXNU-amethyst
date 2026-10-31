@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Panic records must survive the machine halting.
+"""Panic records must decode from the message region.
 
-panic() formats its text and calls PE_panic_hook() with interrupts off, before
-the halt, while the writer's next snapshot is up to a period away. BootLog.c
-chains that hook and writes the panic text synchronously. This check builds a
-synthetic record in the message region and asserts the decoder surfaces it,
-without needing a device.
+The decoder must surface a SHLOGPN1 record plus the pre-panic message tail, and
+BootLog.c must install its hook while preserving the previous one.
+
+Note the hook itself no longer writes to the device: both UFS entry points take
+lck_mtx_lock and then issue a blocking SCSI command, which in panic context
+aborts with "Mutex ... is unexpectedly owned" and cascades. So this check builds
+a synthetic record with wrote=1 synced=1 to exercise the decoder, which is a
+separate concern from what the hook is permitted to do. See
+check-panic-hook-lock.py for the hook's constraints.
 """
 import struct
 import subprocess

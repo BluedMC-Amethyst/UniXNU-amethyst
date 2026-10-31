@@ -1765,7 +1765,6 @@ static void boot_log_panic_record(const char *str) {
   // Runs at most once: a nested panic must not rewrite the record or recurse.
   if (__atomic_exchange_n(&boot_log_panic_fired, 1, __ATOMIC_ACQ_REL)) return;
   if (!boot_log_panic_buffer || !startup_blocks || boot_log_state == 0) return;
-  if (!&native_ufs_log_write) return;
   uint8_t *out = boot_log_panic_buffer;
   const uint32_t cap = LogMsgBlocks * LogBlock;
   memset(out, 0, cap);
@@ -1794,9 +1793,23 @@ static void boot_log_panic_record(const char *str) {
   ph.in_panic_context = 1;
   memcpy(out, &ph, sizeof ph);
   // Report what the medium accepted, not what was attempted.
+  //
+  // Nothing in this function may touch the UFS device. Both entry points are
+  // unsafe here: native_ufs_log_write reaches hostWrite4k and
+  // native_ufs_log_sync reaches hostScsiDir, and both call lck_mtx_lock before
+  // issuing a blocking SCSI command. In a panic handler that lock never falls
+  // free, because the panicking CPU either already holds it or the peer CPU is
+  // being parked, so lck_mtx_lock aborts with "Mutex ... is unexpectedly owned
+  // by thread" at lock_mtx.c:175. That abort is itself the first nested panic
+  // and it destroys the evidence for the original fault.
+  //
+  // So this hook records only that a panic happened, and leaves wrote/synced at
+  // 0. The text itself is already in the message buffer, which the next boot
+  // reads. Persisting it to unixnu belongs to the flush path, which runs on the
+  // writer thread outside panic context.
   struct boot_log_panic_header *live = (struct boot_log_panic_header *)out;
-  live->wrote = native_ufs_log_write(LogMsgFirst, LogMsgBlocks, out);
-  live->synced = &native_ufs_log_sync ? native_ufs_log_sync() : 0;
+  live->wrote = 0;
+  live->synced = 0;
   if (boot_log_prev_panic_hook) boot_log_prev_panic_hook(str);
 }
 
