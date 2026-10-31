@@ -17,6 +17,8 @@
 #include <IOKit/IOLib.h>
 
 extern int native_ufs_log_open(uint64_t *, uint64_t *, const char **) __attribute__((weak_import));
+// panic() calls this on the dying CPU (osfmk/pexpert): chaining it persists the panic text.
+extern void (*PE_arm_debug_panic_hook)(const char *) __attribute__((weak_import));
 extern int native_ufs_log_write(uint64_t, uint32_t, const void *) __attribute__((weak_import));
 extern uint64_t native_ufs_export_blocks(void) __attribute__((weak_import));
 extern int native_ufs_export_write(uint64_t, uint32_t, const void *) __attribute__((weak_import));
@@ -1734,6 +1736,67 @@ static void writer(void *arg, wait_result_t result) {
   }
 }
 
+// Panic record. panic() formats its text and calls PE_panic_hook() with interrupts
+// off on the dying CPU, before the machine halts; the writer's next snapshot is
+// up to 2 s away, so a panic like "Kernel data abort." never otherwise reaches the
+// medium. These writes are pooled UFS transfers bounded by clock deadlines, so
+// they complete without interrupts. The previous hook is preserved and called
+// after ours, so panic tracing behaves exactly as before.
+struct boot_log_panic_header {
+  char magic[8];                 // "SHLOGPN1"
+  uint32_t version, header_bytes;
+  uint64_t boot_id;
+  uint32_t text_bytes, in_panic_context, wrote, synced;
+};
+static void (*boot_log_prev_panic_hook)(const char *);
+static int boot_log_panic_fired;
+
+static void boot_log_panic_record(const char *str) {
+  // Runs at most once: a nested panic must not rewrite the record or recurse.
+  if (__atomic_exchange_n(&boot_log_panic_fired, 1, __ATOMIC_ACQ_REL)) return;
+  if (!boot_log_buffer || !startup_blocks || boot_log_state == 0) return;
+  if (!&native_ufs_log_write) return;
+  uint8_t *out = boot_log_buffer;
+  const uint32_t cap = LogMsgBlocks * LogBlock;
+  memset(out, 0, cap);
+  // Header first, then the panic text, then the live message buffer: the last
+  // lines before the halt are usually what identify the failing subsystem.
+  const uint32_t off = sizeof(struct boot_log_panic_header);
+  uint32_t n = 0;
+  for (const char *c = str; c && *c && off + n < cap - 1; ++c) out[off + n++] = (uint8_t)*c;
+  const uint32_t text = n;
+  struct boot_log_msgbuf *m = msgbufp;
+  if (m && m->msg_bufc && m->msg_size > 0) {
+    int size = m->msg_size, x = m->msg_bufx;
+    if (x < 0 || x >= size) x = 0;
+    for (int i = 0; i < size && off + n < cap - 1; ++i) {
+      char c = m->msg_bufc[(x + i) % size];
+      if (c) out[off + n++] = (uint8_t)c;
+    }
+  }
+  struct boot_log_panic_header ph;
+  memset(&ph, 0, sizeof ph);
+  memcpy(ph.magic, "SHLOGPN1", 8);
+  ph.version = 1;
+  ph.header_bytes = sizeof ph;
+  ph.boot_id = startup_boot_id;
+  ph.text_bytes = text;
+  ph.in_panic_context = 1;
+  memcpy(out, &ph, sizeof ph);
+  // Report what the medium accepted, not what was attempted.
+  struct boot_log_panic_header *live = (struct boot_log_panic_header *)out;
+  live->wrote = native_ufs_log_write(LogMsgFirst, LogMsgBlocks, out);
+  live->synced = &native_ufs_log_sync ? native_ufs_log_sync() : 0;
+  if (boot_log_prev_panic_hook) boot_log_prev_panic_hook(str);
+}
+
+static void boot_log_install_panic_hook(void) {
+  if (!&PE_arm_debug_panic_hook) return;
+  if (boot_log_prev_panic_hook) return;
+  boot_log_prev_panic_hook = PE_arm_debug_panic_hook;
+  PE_arm_debug_panic_hook = boot_log_panic_record;
+}
+
 // Called by the board page's monitor once a second; starts the writer the first time when sheng-log=1.
 void boot_log_tick(unsigned now) {
   (void)now;
@@ -1758,6 +1821,7 @@ void boot_log_tick(unsigned now) {
   if (!boot_log_buffer) { IOLog("AmethystBootLog: buffer allocation failed\n"); return; }
   export_lock = IOLockAlloc();
   if (!export_lock) { IOLog("AmethystBootLog: lock allocation failed\n"); return; }
+  boot_log_install_panic_hook();
   // ponytail: capture one message-buffer snapshot before async diagnostics;
   // periodic snapshots still belong to writer(). No optional probe is called.
   const char *why = "";

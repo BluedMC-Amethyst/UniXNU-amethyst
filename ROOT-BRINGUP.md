@@ -810,3 +810,68 @@ after-graphics-load, after-late-probe, plus gate-timeout. Display internals,
 watchdog handling, root authorization and UFS bounds are unchanged.
 Compile/link exit 0, zero undefined symbols, prelink and pack guards pass,
 `check-display-flush.py` and `check-display-durable.py` pass. Hardware untested.
+
+### Display-flush run user transcript: launchd reached, then kernel data abort
+
+The user transcribed the screen during the display-flush boot (photo text, OCR
+mangled). Decoded sequence: disk1 OwnerData mounts, `load_init_program` loads
+`/usr/appleinternal/sbin/launchd.development` then `/sbin/launchd`, launchd
+calls `shared_region_check_np`, kernel logs
+`vm_shared_region_start_address() failed`, then `Kernel data abort.`
+
+Important qualification: this same shared-region message is **not** fatal here.
+The successful boot 36da18c0 logged it twice at 48.372560/48.386938 s and
+launchd continued to complete many boot tasks. `check-shared-region-panic.py`
+asserts this from the saved log. The message is the documented ENOMEM
+"shared region is empty" branch: `sr_first_mapping == -1`, i.e. dyld probing
+before it maps the cache. It is a normal probe on this board, not the fault.
+
+Reaching launchd is itself progress: the durable-log gate let the machine get
+past bsd_autoconf and into userspace, where the earlier durable run had stopped
+at round 1.
+
+The transcribed PC/register dump cannot be symbolicated: no address in it lies
+inside any segment of the tested kernel (checked against all 17 segment ranges).
+The `Kernel data abort.` panic has a real PC on screen, but transcription mangled
+it beyond use. `check-shared-region-panic.py` records all of the above.
+
+Therefore the remaining unknown is the actual aborting instruction. Panic text
+goes to the in-memory panic log, which `compose()` already folds into writer
+slots, but the writer's next snapshot is up to 2 s away and the machine is
+stopped at the abort. Resolving it needs the panic string persisted from panic
+context, not more on-screen reading.
+
+### Panic-hook candidate: persist the panic text from panic context
+
+`panic()` formats its message and calls `PE_panic_hook()` on the dying CPU with
+interrupts off, before the halt. `PE_arm_debug_panic_hook` is a writable
+function pointer in the DEVELOPMENT build (see pexpert/arm/hwtrace/hwtrace.c),
+so BootLog.c chains it: it saves the previous pointer, installs
+`boot_log_panic_record`, and calls the saved hook afterwards, so panic tracing
+is unchanged.
+
+The record reuses the existing message region (`msg_first` for `msg_blocks`),
+which is why it is written at all: the writer only snapshots every 2000 ms and
+the machine is already halted. Layout: a `SHLOGPN1` header (text_bytes,
+in_panic_context, the write/sync results actually accepted), then the panic
+text, then the live message buffer. A single atomic guard makes it run at most
+once so a nested panic cannot rewrite it or recurse. It only uses the pooled UFS
+transfers that are already deadline-bounded, so it needs no interrupts.
+
+Decoder: `read-sheng-log.py` checks for `SHLOGPN1` in the message region first
+and then writes `panic.txt`, `panic-header.txt` and the pre-panic `msgbuf.txt`,
+printing whether the medium accepted the write. Without this, a panic record
+would be misread as an ordinary message buffer.
+
+Candidate `staging/amethyst-panic-hook/Mu-amethyst-panic-hook.img`,
+80,310,272 bytes, SHA256
+`d5c967c7de9cb4b180c4390a360a0902b10e71da784e7c120a5a2466edb0de0a`;
+kernel SHA256 `3f0685d0022cc2609d64adff946fbb1f0453e04880027f8a1b81641e8387375b`.
+Compile/link exit 0, zero undefined symbols, `check-standins.py`,
+`check-startup-snapshot.py`, `check-display-flush.py` and
+`check-panic-record.py` pass; prelink and pack guards pass. The hook pointer was
+confirmed to live in the writable `__data` segment, not `__const`.
+
+This exists because the display-flush transcript's real abort PC was destroyed
+by transcription. The next run should report the exact panic text and the last
+pre-panic messages as files, with no screen reading required. Hardware untested.

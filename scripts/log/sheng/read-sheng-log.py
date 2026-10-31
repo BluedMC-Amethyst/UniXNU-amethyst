@@ -32,6 +32,10 @@ EXPORT = struct.Struct('<4I')   # version 2: export_first, export_blocks, export
 EXPORT_FIELDS = ('export_first', 'export_blocks', 'export_bytes', 'export_generation')
 EXPORT3 = struct.Struct('<I')   # version 3: export_below (the export region ends that many blocks below the window)
 DIAG4 = struct.Struct('<II')    # version 4: diag_first, diag_bytes (package/BootDiagExport.c, in the same region)
+# The panic record (BootLog.c boot_log_panic_record): it takes over the message region when panic() fires, so it must be checked before
+# the header is trusted for message bytes.
+PANIC = struct.Struct('<8sIIQIIII')
+PANIC_FIELDS = ('magic', 'version', 'header_bytes', 'boot_id', 'text_bytes', 'in_panic_context', 'wrote', 'synced')
 LOG_BLOCKS = 8192               # the window the reader dumps (package/linux-log/init, NativeUfs kLogReserveBlocks)
 
 
@@ -94,8 +98,21 @@ def decode(blob, out):
     lines = [f'{k}={v.split(chr(0))[0] if isinstance(v, str) else (v.split(b"\0")[0].decode(errors="replace") if isinstance(v, bytes) else v)}'
              for k, v in h.items()]
     (run / 'header.txt').write_text('\n'.join(lines) + '\n')
-    msg = blob[h['msg_first'] * BLOCK:(h['msg_first'] + h['msg_blocks']) * BLOCK][:h['msg_bytes']]
-    (run / 'msgbuf.txt').write_bytes(msg)
+    region = blob[h['msg_first'] * BLOCK:(h['msg_first'] + h['msg_blocks']) * BLOCK]
+    panic = None
+    if region[:8] == b'SHLOGPN1':
+        # panic() overwrote the message region synchronously before the machine halted.
+        p = dict(zip(PANIC_FIELDS, PANIC.unpack_from(region)))
+        text = region[p['header_bytes']:p['header_bytes'] + p['text_bytes']]
+        (run / 'panic.txt').write_bytes(text)
+        (run / 'panic-header.txt').write_text('\n'.join(f'{k}={v}' for k, v in p.items()) + '\n')
+        tail = region[p['header_bytes'] + p['text_bytes']:]
+        (run / 'msgbuf.txt').write_bytes(tail.rstrip(b'\0'))
+        panic = (p, text)
+        msg = region
+    else:
+        msg = region[:h['msg_bytes']]
+        (run / 'msgbuf.txt').write_bytes(msg)
     count, written = h['slot_count'], h['slots_written']
     first = max(0, written - count)
     slots = []
@@ -109,8 +126,13 @@ def decode(blob, out):
         unpack_export(blob[start:start + h['export_bytes']], run)
     elif h.get('export_bytes'):
         print(f'export generation {h["export_generation"]}: {h["export_bytes"]} bytes below the window (fetched separately)')
+    if panic:
+        p, text = panic
+        print(f'{run}: PANIC RECORD wrote={p["wrote"]} synced={p["synced"]} text={p["text_bytes"]} bytes')
+        print('  panic: ' + text.split(b'\0')[0].decode(errors='replace').splitlines()[0][:200])
+        print(f'  pre-panic messages: {len((run / "msgbuf.txt").read_bytes())} bytes')
     print(f'{run}: tag={tag} uptime={h["uptime_s"]}s slots={written} (kept {len(slots)}) rounds={h["rounds"]} '
-          f'errors={h["write_errors"]} gpt={h["gpt_open"]:x}/{h["gpt_last"]:x} msgbuf={len(msg)} bytes')
+          f'errors={h["write_errors"]} gpt={h["gpt_open"]:x}/{h["gpt_last"]:x} msgbuf={len(region)} bytes')
     return run
 
 
