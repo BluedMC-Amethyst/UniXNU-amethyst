@@ -96,7 +96,9 @@ def main():
                     help='adb serial to read from (else ANDROID_SERIAL, else the '
                          'only attached device)')
     ap.add_argument('--device', default=None,
-                    help='block device to read instead of looking up the partition')
+                    help='block device holding the 32 MiB window at its end, read '
+                         'with dd (only for a node that starts at the window; the '
+                         'default path uses tail -c on the partition)')
     ap.add_argument('--expect-first', type=int, default=90660608,
                     help='expected first LBA in 4096-byte blocks; guards against '
                          'reading the wrong region (default: unixnu first LBA per '
@@ -130,12 +132,17 @@ def main():
               f'({LOG_BLOCKS * BLOCK // 2**20} MiB)')
 
     remote = '/tmp/amethyst-log.bin'
-    command = f'dd if={region} of={remote} bs={BLOCK} count={LOG_BLOCKS} '
+    # toybox's dd cannot seek on a block device: `dd skip=<huge>` prints
+    # "/dev/block/sdaNN: Can't skip", runs for minutes and copies nothing. The
+    # window is the *last* LOG_BLOCKS blocks of the partition, so it is taken
+    # with `tail -c`, which needs no seek. Errors are left visible on purpose: a
+    # failed copy must say why, not read back as "0 bytes".
     if skip is not None:
-        command += f'skip={skip} '
-    # The shell can report 255 after dd finished (the link drops as the session
-    # closes), so the copy is judged by its size, not by exit status.
-    adb('shell', command + '2>/dev/null', check=False)
+        command = (f'tail -c {LOG_BLOCKS * BLOCK} /dev/block/by-name/{args.partition} '
+                   f'> {remote}')
+    else:
+        command = f'dd if={region} of={remote} bs={BLOCK} count={LOG_BLOCKS}'
+    adb('shell', command, check=False)
     copied = adb('shell', f'stat -c %s {remote} 2>/dev/null', check=False).decode().strip()
     if copied != str(LOG_BLOCKS * BLOCK):
         sys.exit(f'the copy in {remote} has {copied or "no"} bytes, '
