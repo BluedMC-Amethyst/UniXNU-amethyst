@@ -206,6 +206,17 @@ branch. The other service SIGABRTs remain separately unexplained. Do not treat
 trust-cache query warnings as proof of code-signing rejection. Next evidence
 needed: watchdog trap PC/LR and service abort payloads or exception reports.
 
+### Fault-evidence candidate (host only)
+
+`Mu-amethyst-service-faults.img` adds USER_BRK pid/PC/LR/ESR logging before
+unchanged breakpoint exception delivery, and bounded SERVICE_ABORT reason-string
+copying for selected failed services before unchanged abort handling. Failed
+user-memory copies are reported, not dereferenced directly. The existing exit
+diagnostics remain. No exception, watchdog or signing policy is bypassed.
+SHA-256: `d0589f312be47beac899c480e65884f43d768016dcd095d50facc51749894a0b`.
+Compile/link/prelink and unchanged non-kernel payload checks passed. Original
+compiler warnings remain in the saved logs; runtime execution is untested.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
