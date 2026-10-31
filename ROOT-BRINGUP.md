@@ -372,6 +372,31 @@ The only other edit is the boot argument list, which adds
 already-compiled lifecycle hooks. Payload staging is 4 files, `scratch-data.img`
 included. Not yet booted; requires `sudo fastboot boot` and photo capture.
 
+### Boot attempt 1 of that candidate FAILED (phone healthy, nothing written)
+
+Booting `ce89993c…` stalled at the graphical/green early-boot area before the
+text console appeared. Android still boots normally; no partition was touched.
+
+Two defects, both mine:
+
+1. **The candidate could not have answered the display question.** The Legacy
+   probe only retains the object at `offline-legacy-phase` 2/3/4 and only reaches
+   `probe()`/`attach()`/`start()` and publication at **phase 4**. No phase was
+   supplied, so it defaulted to 1, returned early and released the object. The
+   driver never executed. This should have been checked before imaging.
+2. **`boot_progress_stage` became live code.** In the proven baseline it was
+   unused, so the linker discarded it; `bsd_init()` calls it as its first
+   statement, before `PE_create_console()`. The hook is now a pure parameter
+   no-op with no print, allocation, lock or clock read, and the ordering
+   hazard is documented in the file.
+
+Diagnostics were added so a silent gate can never be mistaken for a hang again:
+`NativeLegacyDisplay: probe phase=… init=… base=… WxH depth=… rowBytes=… rotate=…`,
+`deferred to bsd_autoconf boundary`, and
+`lifecycle probe=%u attach=%u start=%u dt=%u nub=%u/%u phase=%u`.
+The probe source is now regenerated from the pristine upstream file with counted,
+asserted patches instead of hand edits.
+
 
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
