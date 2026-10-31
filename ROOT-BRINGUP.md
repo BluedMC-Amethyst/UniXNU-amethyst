@@ -459,6 +459,37 @@ Bisect A repackaged, prelinked: 80,248,832 bytes, sha256
 Verified in-image kernel is 124,518,400 bytes with all 17 segments including
 every prelink segment; boot args still byte-identical to the baseline. Untested.
 
+### Bisect A result: booted to the baseline checkpoint
+
+The prelinked flag-only kernel reached the baseline boot checkpoint. That clears
+`XNU_NATIVE_LEGACY_DISPLAY` as a cause and confirms the empty-prelink segments
+were the entire fault. The three earlier "fixes" were addressing non-problems.
+
+### Correction: `-textconsole` does NOT block the probe
+
+An earlier note in this file claimed the probe could never run under
+`-textconsole` because it needs a graphics-mode console. That was wrong and is
+retracted. `PE_state.video` is populated from the boot args in `PE_init_platform`
+(long before `PE_create_console`), and `kPETextMode` only clears
+`gc_graphics_boot`; it does not clear `vinfo` or `PE_state.video`. So
+`PE_current_console()` still returns the real `v_baseAddr`, `v_width`,
+`v_height`, `v_depth` and `v_rowBytes`, the probe's gate passes, and diagnostics
+stay readable. No boot-argument trade-off is required.
+
+### Display candidate, correctly prelinked
+
+`staging/amethyst-owner-union-display/Mu-amethyst-owner-union-display.img`,
+80,273,408 bytes, sha256
+`eee3e9f0134ad5bcd8b4bbe6905c966f6fd18f19cb27e699dff1a1ee7bc1a5e5`.
+
+Rebuilt from the proven baseline with one kernel variable. Verified in-image:
+kernel 124,604,416 bytes with all 17 segments including every prelink segment;
+the three diagnostics are present; ADT, trust cache and packed Data seed are
+byte-identical to the baseline. Args add only
+`offline-mobile-graphics-load=1 offline-legacy-register=1 offline-legacy-phase=4`,
+and `offline-legacy-unit-scale` stays unset so no display policy is invented.
+Untested.
+
 
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
