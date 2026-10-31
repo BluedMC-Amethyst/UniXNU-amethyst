@@ -321,6 +321,16 @@ not proof that lifecycle/publication runs on Amethyst. Upstream publication
 code calls Sheng-specific peripheral probes; those must be excluded rather
 than supplied as pretend-success stubs. No display boot image is ready yet.
 
+Display-only publication code now compiles with foreign peripheral calls
+omitted, alongside the GOP presenter and Legacy object. Original method bindings
+assemble, late metaclass objects are produced, and bsd_init compiles with its
+existing Legacy lifecycle hooks enabled. The isolated link fails (exit 1) on
+boot_progress_cancel_scanout, boot_progress_prepare_scanout,
+boot_progress_pulse_anchor and boot_progress_stage. These optional upstream
+hooks are unresolved in this static kernel baseline. Resolve the console/
+scanout ownership contract before enabling framebuffer transfer; no no-op
+ownership stubs or hardware image were produced.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
