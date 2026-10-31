@@ -1,0 +1,76 @@
+name: Build iPadOS Data seed
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch and verify original OS image
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output firmware.ipsw 'https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw'
+          unzip -p firmware.ipsw 044-76040-038.dmg > original-os.dmg
+          echo '3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d  original-os.dmg' | shasum -a 256 -c -
+          rm firmware.ipsw
+
+      - name: Create populated RAM Data seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output os-mount data-mount
+          OS="$PWD/os-mount"
+          DATA="$PWD/data-mount"
+          cleanup() {
+            hdiutil detach "$DATA" || true
+            hdiutil detach "$OS" || true
+          }
+          trap cleanup EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$OS" original-os.dmg
+          echo "8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25  $OS/sbin/launchd" | shasum -a 256 -c -
+          hdiutil create -size 2g -layout NONE -fs APFS -volname OwnerData -type UDTO output/owner-data.cdr
+          hdiutil attach -nobrowse -owners on -mountpoint "$DATA" output/owner-data.cdr
+          sudo ditto --rsrc --extattr --acl "$OS/private/var" "$DATA"
+          # ponytail: staged apps omitted for initial RAM-only boot; add after Data mount qualification.
+          sudo rm -rf "$DATA/staged_system_apps"
+          sudo mkdir -p "$DATA/keybags" "$DATA/mobile/tmp" "$DATA/tmp" "$DATA/run"
+          sudo chmod 1777 "$DATA/tmp"
+          diskutil info -plist "$DATA" > output/volume-info.plist
+          sync
+          hdiutil detach "$DATA"
+          hdiutil detach "$OS"
+          trap - EXIT
+          python3 - <<'PY'
+          import hashlib, json, plistlib
+          from pathlib import Path
+          p = Path('output/owner-data.cdr')
+          with p.open('rb') as f:
+              assert f.read(36)[32:36] == b'NXSB', 'Expected raw APFS, not a partitioned image'
+              f.seek(0)
+              digest = hashlib.file_digest(f, 'sha256').hexdigest()
+          info = plistlib.loads(Path('output/volume-info.plist').read_bytes())
+          assert p.stat().st_size == 2 * 1024**3
+          record = dict(volume_uuid=info['VolumeUUID'], image_bytes=p.stat().st_size,
+                        image_sha256=digest, source_os_sha256='3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d',
+                        ram_only=True, hardware_tested=False, staged_system_apps=False)
+          Path('output/seed.json').write_text(json.dumps(record, indent=2) + '\n')
+          Path('output/SHA256SUMS').write_text(f'{digest}  owner-data.cdr\n')
+          print(json.dumps(record, indent=2))
+          PY
+          (cd output && shasum -a 256 -c SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amethyst-ipados-21H461-data-seed
+          path: output/
+          if-no-files-found: error
+          retention-days: 7
