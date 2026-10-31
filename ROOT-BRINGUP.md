@@ -217,6 +217,25 @@ SHA-256: `d0589f312be47beac899c480e65884f43d768016dcd095d50facc51749894a0b`.
 Compile/link/prelink and unchanged non-kernel payload checks passed. Original
 compiler warnings remain in the saved logs; runtime execution is untested.
 
+### Service-fault result and library-path candidate
+
+Photos `_X8A0099.JPG` and `_X8A0102.JPG` show bounded abort strings from
+SpringBoard, bluetoothd and contextstored: they cannot dlopen
+`/usr/lib/libobjc-trampolines.dylib` (no such file, not in dyld cache).
+The watchdog separately traps; its address still needs exact-binary matching.
+
+Existing check-owner-cryptex-fallback-checkpoints.py records that the dyld
+fallback environment did not resolve this same library failure. Existing
+check-owner-union-checkpoints.py records native union-root composition exposing
+the original library in offline testing, not Amethyst hardware qualification.
+
+The owner-union candidate selects that existing read-only authenticated native
+union mount and disables the previous separate cache-carrier exception. Data
+stays RAM-backed; original signatures and signed volume policies are retained.
+Watchdog handling is unchanged, so this is not a claim to fix both failures.
+SHA-256: `73c478d5bf60130761db524fbb37a8ce7bcb4bb6a64241a3f9ea2da3a50075e4`.
+Compile/link/prelink and payload comparisons pass; hardware untested.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
