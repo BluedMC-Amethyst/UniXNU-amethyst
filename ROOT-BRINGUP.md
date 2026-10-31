@@ -108,6 +108,19 @@ has no hdiutil or mkfs.apfs. A supplied populated APFS Data seed, or access to
 a macOS host to generate it, is the current prerequisite. Do not enable the
 Data mount switch without that input or substitute Android userdata.
 
+### macOS Actions seed produced
+
+Run 41166657395 succeeded. Downloaded artifact metadata identifies a 2 GiB
+populated APFS seed, UUID `4777B134-0723-48C0-A32B-333007AB6166`.
+Local SHA-256 verification matches
+`d048bdcee1fba522cf832e28485674f50b5ce583ce4300b3d56b429c05c74ce8`.
+Existing DarwinBoot zero-page packing preserves that logical hash and produces
+247140928 encoded bytes, SHA-256
+`4a5bb921f50fcae4d42b681004ba1453f896a5e04846de6f195e6d92a430ead0`.
+This is close to the loader's 256 MiB packed-input ceiling; do not silently
+truncate it or load the entire logical disk as a dense boot input.
+RAM-backed Data integration remains pending; the seed is not hardware-tested.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
