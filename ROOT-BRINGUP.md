@@ -190,6 +190,22 @@ SHA-256: `6a914780d3d7cd22b399f1c7174d5307bc7ed001e5cc32b51889c9a069bec504`.
 Compilation, link/prelink and payload comparisons passed; hardware untested.
 The configuration, ADT, trust caches, RAM seed and firmware are unchanged.
 
+### Service-exit hardware evidence
+
+Photo `_X8A0093.JPG` beside the service-exits image records:
+
+- watchdogd pid 52: rv=0x5, signal=5, namespace=2, code=0x5 (SIGTRAP).
+- SpringBoard: rv=0x6, signal=6, namespace=8, code=0x1, repeatedly.
+- bluetoothd, contextstored and seserviced: the same SIGABRT/namespace 8/code 1.
+- Final panic still reports watchdogd exiting, namespace 22/subcode 0x55.
+
+The immediate watchdog exit evidence is distinct from the later panic reason.
+SIGTRAP is consistent with the missing-IOWatchdog branch in the existing host
+analysis, but no hardware fault PC or assertion string has established that
+branch. The other service SIGABRTs remain separately unexplained. Do not treat
+trust-cache query warnings as proof of code-signing rejection. Next evidence
+needed: watchdog trap PC/LR and service abort payloads or exception reports.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
