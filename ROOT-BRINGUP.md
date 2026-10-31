@@ -397,6 +397,40 @@ Diagnostics were added so a silent gate can never be mistaken for a hang again:
 The probe source is now regenerated from the pristine upstream file with counted,
 asserted patches instead of hand edits.
 
+### Second boot FAILED identically; real contradiction found
+
+`88a81bac…` (phase=4) stalled at the same green/graphical point. Two of my own
+fixes were irrelevant, and the reason the probe could never have worked is a
+boot-argument contradiction:
+
+The baseline args contain `-textconsole`, so `PE_create_console()` takes the
+`kPETextMode` branch. The Legacy probe's first validity gate requires
+`PE_current_console(&video) == 0` with `v_depth == 32` and a live `v_baseAddr`,
+i.e. a **graphics-mode** console. With `-textconsole` it silently returns at
+stage 2 and the driver never starts regardless of `offline-legacy-phase`.
+Dropping `-textconsole` would remove the only readable diagnostics, so this needs
+a deliberate decision, not another blind image.
+
+The pre-console stall is still unexplained and is a **separate** fault. A
+single-variable bisect was built to settle it.
+
+### Bisect A: flag only, no driver
+
+`staging/amethyst-bisect-legacy-flag/Mu-amethyst-bisect-legacy-flag.img`,
+76,873,728 bytes, sha256 `d2ff8f475e4bc4307094f1038793a88105e77bff7c4bb9ee09f3665f8d2a9add`.
+
+`sched`/`bsd_init` recompiled with only `XNU_NATIVE_LEGACY_DISPLAY=1` (baseline is
+`0`). No display, presenter, ownership or binding objects are linked; the two
+entry points the macro references are inert empty functions in one object.
+Verified: zero undefined symbols, no `__ZTV19NativeLegacyDisplay`,
+`native_legacy_display_allocate`, `native_gop_presenter_create` or
+`boot_progress_prepare_scanout`. Boot arguments are byte-identical to the proven
+baseline, `-textconsole` included; no `offline-legacy-*` arguments.
+
+Interpretation: boots to "Early boot complete" ⇒ the macro is innocent and the
+driver objects are at fault. Stalls identically ⇒ the macro alone is at fault.
+Not yet booted.
+
 
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
