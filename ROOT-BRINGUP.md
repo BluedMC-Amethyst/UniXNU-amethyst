@@ -176,6 +176,20 @@ Next obtain process exit/crash evidence or targeted RAM-only diagnostics before
 changing AMFI, watchdog policy or hardware-driver selections. Do not suppress
 the watchdog panic as a substitute for diagnosing the service failures.
 
+### Service-exit diagnostic candidate
+
+Existing check-watchdogd-branches.py demonstrates, with explicitly substituted
+APIs, that the pinned original watchdogd traps when IOWatchdog is absent on a
+physical machine. This is a lead, not proof of the photographed fault.
+
+`Mu-amethyst-service-exits.img` adds only bounded SERVICE_EXIT logging for the
+six photographed failing services in kern_exit.c. It records pid, wait status,
+signal and exit-reason namespace/code before committing the exit reason.
+It does not suppress watchdogs, disable AMFI or change service exit policy.
+SHA-256: `6a914780d3d7cd22b399f1c7174d5307bc7ed001e5cc32b51889c9a069bec504`.
+Compilation, link/prelink and payload comparisons passed; hardware untested.
+The configuration, ADT, trust caches, RAM seed and firmware are unchanged.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
