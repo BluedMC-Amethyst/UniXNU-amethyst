@@ -39,9 +39,11 @@ jobs:
           echo "8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25  $OS/sbin/launchd" | shasum -a 256 -c -
           hdiutil create -size 2g -layout NONE -fs APFS -volname OwnerData -type UDTO output/owner-data.cdr
           hdiutil attach -nobrowse -owners on -mountpoint "$DATA" output/owner-data.cdr
-          sudo ditto --rsrc --extattr --acl "$OS/private/var" "$DATA"
-          # ponytail: staged apps omitted for initial RAM-only boot; add after Data mount qualification.
-          sudo rm -rf "$DATA/staged_system_apps"
+          # Exclude before writing: deleting after ditto leaves nonzero APFS
+          # blocks that zero-page packing cannot discard.
+          sudo /usr/bin/tar -C "$OS/private/var" --exclude='./staged_system_apps' -cpf - . |
+            sudo /usr/bin/tar -C "$DATA" -xpf -
+          test ! -e "$DATA/staged_system_apps"
           sudo mkdir -p "$DATA/keybags" "$DATA/mobile/tmp" "$DATA/tmp" "$DATA/run"
           sudo chmod 1777 "$DATA/tmp"
           diskutil info -plist "$DATA" > output/volume-info.plist
