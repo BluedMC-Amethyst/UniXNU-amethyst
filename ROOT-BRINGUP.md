@@ -59,6 +59,26 @@ It does not unconditionally accept an arbitrary cache mount.
 Compilation, link, prelink and packaging comparisons passed; hardware untested.
 The config, ADT, trust caches, shim, firmware body and DTB remain unchanged.
 
+## Cache-carrier result and owner boot-set metadata
+
+Photo `_X8A0088.JPG` beside the carrier image shows launchd running boot tasks.
+The explicit fatal error is now failure to obtain `boot-manifest-hash`, followed
+by PID 1 termination. This establishes progress beyond shared-cache rejection,
+not a completed userland boot.
+
+The next isolated candidate enables the existing owner boot-manifest producer
+and caller. Its SHA-384 boot-set identifier is derived from both authenticated
+signed policy envelopes, domain-separated as `VerifiedRoot.OwnerBootSet.v1`.
+It is labelled as owner metadata and refuses to overwrite an existing firmware
+identity. The NativeUfs digest query checks the exact device, UUID and provider
+and zeroes output on refusal. No arbitrary Apple manifest hash is substituted.
+
+`Mu-amethyst-owner-manifest.img` SHA-256:
+`42fa46ad4a0d062a4ebe0ff5063c66b755f1e33965c3518ccd9c72524379f8b1`.
+Compilation, isolated link with no undefined symbols, prelink and packaging
+checks passed. Config, ADT, trust caches and firmware remain unchanged.
+Hardware execution of metadata publication is untested. Data stays disabled.
+
 The isolated candidate scripts and signed policy inputs currently live in the
 maintainer workspace, not this repository. This record documents evidence,
 not a complete reproducible implementation. Upstreaming the build integration,
